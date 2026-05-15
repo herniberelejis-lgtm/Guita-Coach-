@@ -1,7 +1,5 @@
 # tests/test_model_migration.py
-import pytest
-from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import inspect, text
 
 def test_tx_type_column_exists_after_migration():
     """tx_type column must exist after init_db runs migrations."""
