@@ -1,4 +1,5 @@
 """Insights — proyecciones, velocidad, resumen mensual."""
+from collections import Counter
 from datetime import date
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -32,20 +33,24 @@ def month_insights(db: Session = Depends(get_db)):
         Transaction.status.in_(["confirmed", "classified"]),
     ).all()
 
+    expense_txs = [t for t in txs if getattr(t, 'tx_type', 'expense') == 'expense']
+
     limits = {
         "necesidades": income * user.necesidades_pct / 100,
         "gustos": income * user.gustos_pct / 100,
         "ahorro": income * user.ahorro_pct / 100,
     }
 
+    dr = max(days_remaining, 1)
     franjas = {}
     for cat, limit in limits.items():
-        spent = sum(t.amount for t in txs if t.category == cat)
+        spent = sum(t.amount for t in expense_txs if t.category == cat)
+        remaining = max(0, limit - spent)
         daily_rate = spent / days_passed if days_passed > 0 else 0
         projection = spent + daily_rate * days_remaining
 
         top_merchants = {}
-        for t in txs:
+        for t in expense_txs:
             if t.category == cat:
                 top_merchants[t.merchant] = top_merchants.get(t.merchant, 0) + t.amount
         top = sorted(top_merchants.items(), key=lambda x: x[1], reverse=True)[:3]
@@ -53,11 +58,13 @@ def month_insights(db: Session = Depends(get_db)):
         franjas[cat] = {
             "spent": spent,
             "limit": limit,
+            "remaining": remaining,
             "usage_pct": round(spent / limit * 100, 1) if limit > 0 else 0,
             "daily_rate": round(daily_rate, 0),
             "projected_total": round(projection, 0),
             "will_exceed": projection > limit,
             "top_merchants": [{"merchant": m, "amount": a} for m, a in top],
+            "daily_allowance": round(remaining / dr, 0),
         }
 
     # Días hasta cobro
@@ -69,8 +76,22 @@ def month_insights(db: Session = Depends(get_db)):
         payday_next = date(next_month.year, next_month.month, payday)
         days_to_payday = (payday_next - now).days
 
-    total_spent = sum(t.amount for t in txs)
+    total_spent = sum(t.amount for t in expense_txs)
     total_budget = income
+
+    # Frequent merchants (top 5 by count, expense only)
+    merchant_counts = Counter(t.merchant for t in expense_txs if t.merchant)
+    frequent_merchants = [
+        {
+            "merchant": m,
+            "count": c,
+            "total": sum(t.amount for t in expense_txs if t.merchant == m),
+        }
+        for m, c in merchant_counts.most_common(5)
+    ]
+
+    total_remaining = max(income - total_spent, 0)
+    daily_allowance = round(total_remaining / dr, 0)
 
     return {
         "month": month,
@@ -82,6 +103,8 @@ def month_insights(db: Session = Depends(get_db)):
         "days_to_payday": days_to_payday,
         "franjas": franjas,
         "transaction_count": len(txs),
+        "daily_allowance": daily_allowance,
+        "frequent_merchants": frequent_merchants,
     }
 
 

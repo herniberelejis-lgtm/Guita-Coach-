@@ -27,14 +27,18 @@ class BudgetUpdatePayload(BaseModel):
     payday: Optional[int] = None
 
 
-def _franja_data(user: User, txs: list, month: str) -> dict:
+def _franja_data(user: User, txs: list, month: str, days_remaining: int = 1) -> dict:
     income = user.monthly_income or 0
     limits = {
         "necesidades": income * user.necesidades_pct / 100,
         "gustos": income * user.gustos_pct / 100,
         "ahorro": income * user.ahorro_pct / 100,
     }
-    spent = {cat: sum(t.amount for t in txs if t.category == cat) for cat in limits}
+    spent = {
+        cat: sum(t.amount for t in txs if t.category == cat and getattr(t, 'tx_type', 'expense') == 'expense')
+        for cat in limits
+    }
+    dr = max(days_remaining, 1)
     return {
         "month": month,
         "income": income,
@@ -47,6 +51,7 @@ def _franja_data(user: User, txs: list, month: str) -> dict:
                 "spent": spent[cat],
                 "remaining": max(0, limits[cat] - spent[cat]),
                 "usage_pct": round(spent[cat] / limits[cat] * 100, 1) if limits[cat] > 0 else 0,
+                "daily_allowance": round(max(0, limits[cat] - spent[cat]) / dr, 0),
             }
             for cat in ["necesidades", "gustos", "ahorro"]
         ],
@@ -71,10 +76,21 @@ def get_current_budget(db: Session = Depends(get_db)):
         if now.month < 12 else (date(now.year + 1, 1, 1) - date(now.year, now.month, 1)).days
     days_passed = now.day
 
-    data = _franja_data(user, txs, month)
+    days_remaining = max(days_in_month - days_passed, 1)
+    data = _franja_data(user, txs, month, days_remaining=days_remaining)
     data["days_passed"] = days_passed
     data["days_in_month"] = days_in_month
     data["days_remaining"] = days_in_month - days_passed
+
+    total_income = sum(t.amount for t in txs if getattr(t, 'tx_type', 'expense') == 'income')
+    total_expenses = sum(t.amount for t in txs if getattr(t, 'tx_type', 'expense') == 'expense')
+    balance = total_income - total_expenses
+    pending_count = sum(1 for t in txs if t.needs_review and t.status != "reviewed")
+
+    data["total_income"] = total_income
+    data["total_expenses"] = total_expenses
+    data["balance"] = balance
+    data["pending_count"] = pending_count
     data["onboarding_done"] = user.onboarding_done
     data["name"] = user.name
     data["payday"] = user.payday
