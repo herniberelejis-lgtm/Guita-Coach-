@@ -10,42 +10,78 @@ from ..services.alert_engine import run_alert_engine
 router = APIRouter(prefix="/api/sync", tags=["sync"])
 
 
-async def _save_transactions(items: list[dict], db: Session):
-    saved = 0
-    for item in items:
-        raw_ref = str(item.get("raw_reference", ""))
+async def _save_transaction_item(item: dict, user_id: int, db: Session) -> bool:
+    """Save one transaction. Returns True if saved, False if duplicate."""
+    raw_ref = str(item.get("id") or item.get("raw_reference", ""))
+    source = item.get("source", "")
+
+    if raw_ref:
         exists = db.query(Transaction).filter(
-            Transaction.user_id == 1,
+            Transaction.user_id == user_id,
             Transaction.raw_reference == raw_ref,
-            Transaction.source == item["source"],
-        ).first() if raw_ref else None
-
+            Transaction.source == source,
+        ).first()
         if exists:
-            continue
+            return False
 
-        result = await classify(item["merchant"], item["amount"], item["source"], db)
+    tx_type = item.get("tx_type", "expense")
 
+    if tx_type == "income":
         tx = Transaction(
-            user_id=1,
-            source=item["source"],
-            provider=item.get("provider", ""),
-            merchant=item["merchant"],
+            user_id=user_id,
+            source=source,
+            tx_type="income",
             amount=item["amount"],
+            currency=item.get("currency", "ARS"),
             date=item["date"],
-            month=item["date"][:7],
+            month=item.get("month", item["date"][:7]),
+            merchant=item.get("merchant", ""),
+            provider=item.get("provider", ""),
+            category="ingreso",
+            subcategory="",
+            status="confirmed",
+            confidence=1.0,
+            needs_review=item.get("needs_review", False),
+            raw_reference=raw_ref,
+        )
+    else:
+        result = await classify(
+            item.get("merchant", ""),
+            item.get("amount", 0),
+            source,
+            db,
+        )
+        tx = Transaction(
+            user_id=user_id,
+            source=source,
+            tx_type="expense",
+            amount=item["amount"],
+            currency=item.get("currency", "ARS"),
+            date=item["date"],
+            month=item.get("month", item["date"][:7]),
+            merchant=item.get("merchant", ""),
+            provider=item.get("provider", ""),
             category=result["category"],
             subcategory=result.get("subcategory", ""),
             status="confirmed",
             confidence=result.get("confidence", 0.7),
             rule_used=result.get("rule_used"),
             ai_reason=result.get("reason"),
+            needs_review=item.get("needs_review", False) or result.get("needs_review", False),
             raw_reference=raw_ref,
-            needs_review=result.get("needs_review", False),
         )
-        db.add(tx)
-        saved += 1
 
+    db.add(tx)
     db.commit()
+    return True
+
+
+async def _save_transactions(items: list[dict], user_id: int, db: Session) -> int:
+    """Save a list of transaction items. Returns count of newly saved."""
+    saved = 0
+    for item in items:
+        if await _save_transaction_item(item, user_id=user_id, db=db):
+            saved += 1
     return saved
 
 
@@ -61,7 +97,7 @@ async def sync_gmail(background_tasks: BackgroundTasks, db: Session = Depends(ge
     except Exception as e:
         raise HTTPException(502, f"Error al leer Gmail: {str(e)}")
 
-    saved = await _save_transactions(items, db)
+    saved = await _save_transactions(items, user_id=1, db=db)
 
     conn.last_sync = datetime.utcnow()
     db.commit()
@@ -83,7 +119,7 @@ async def sync_mp(background_tasks: BackgroundTasks, db: Session = Depends(get_d
     except Exception as e:
         raise HTTPException(502, f"Error al leer Mercado Pago: {str(e)}")
 
-    saved = await _save_transactions(items, db)
+    saved = await _save_transactions(items, user_id=1, db=db)
 
     conn.last_sync = datetime.utcnow()
     db.commit()
