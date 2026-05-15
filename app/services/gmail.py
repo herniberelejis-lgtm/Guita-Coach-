@@ -11,6 +11,21 @@ from ..config import get_settings
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 
+_INCOME_PATTERNS = re.compile(
+    r"recibiste|te acreditaron|transferencia recibida|deposito recibido|acreditaci[oó]n",
+    re.IGNORECASE
+)
+
+def _is_income_email(subject_or_body: str) -> bool:
+    """Returns True if the text indicates the user received money."""
+    return bool(_INCOME_PATTERNS.search(subject_or_body))
+
+def _extract_sender_name(msg: dict) -> str:
+    """Extracts display name from 'Name <email@domain>' format."""
+    sender = msg.get("from", "")
+    match = re.match(r'^([^<]+)<', sender)
+    return match.group(1).strip() if match else sender
+
 def get_oauth_url(state: str) -> str:
     settings = get_settings()
     redirect = f"{settings.app_url}/api/auth/gmail/callback"
@@ -79,11 +94,31 @@ def _parse_email(msg: dict) -> Optional[dict]:
     full_text = _extract_body(msg)
     text = f"{subject}\n{snippet}\n{full_text}"
 
+    # Check income first
+    if _is_income_email(text):
+        amounts = re.findall(r'\$([\d\.]+(?:,\d{1,2})?)', text)
+        amount = max((_parse_amount(a) for a in amounts), default=0.0)
+        if amount >= 100:
+            return {
+                "merchant": _extract_sender_name({"from": sender}) or "Ingreso Gmail",
+                "amount": amount,
+                "date": _parse_date(date_str),
+                "provider": "Gmail",
+                "source": "gmail",
+                "tx_type": "income",
+                "raw_reference": subject,
+                "confidence": 0.85,
+            }
+
+    # Fall through to expense detection
     result = _try_parse_mercadopago(text, subject, date_str, sender)
     if result:
+        result.setdefault("tx_type", "expense")
         return result
 
     result = _try_parse_generic(text, subject, date_str, sender)
+    if result:
+        result.setdefault("tx_type", "expense")
     return result
 
 def _extract_body(msg: dict) -> str:
