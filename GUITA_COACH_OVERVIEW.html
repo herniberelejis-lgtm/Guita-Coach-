@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guita Coach — Overview del equipo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f5f7fa;
+      color: #1a2332;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    /* ── Header ── */
+    header {
+      background: #09172A;
+      color: white;
+      padding: 40px 48px 32px;
+      border-bottom: 4px solid #C8A84B;
+    }
+    header h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.5px; }
+    header p  { color: #a0aec0; margin-top: 6px; font-size: 0.95rem; }
+    .badge {
+      display: inline-block;
+      background: #C8A84B;
+      color: #09172A;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+      margin-top: 12px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    /* ── Layout ── */
+    main { max-width: 1000px; margin: 0 auto; padding: 40px 24px 80px; }
+
+    section { margin-bottom: 48px; }
+    h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #09172A;
+      border-left: 4px solid #C8A84B;
+      padding-left: 12px;
+      margin-bottom: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    h3 { font-size: 0.95rem; font-weight: 600; color: #374151; margin-bottom: 8px; }
+
+    /* ── Cards grid ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+    @media (max-width: 700px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px 22px;
+      border: 1px solid #e5e9f0;
+      box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    }
+    .card-icon { font-size: 1.6rem; margin-bottom: 10px; }
+    .card h3 { font-size: 0.9rem; color: #09172A; margin-bottom: 4px; }
+    .card p  { font-size: 0.83rem; color: #6b7280; }
+
+    /* ── Flow steps ── */
+    .flow { display: flex; flex-direction: column; gap: 0; }
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      position: relative;
+    }
+    .step:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      left: 16px;
+      top: 36px;
+      bottom: -16px;
+      width: 2px;
+      background: #e5e9f0;
+    }
+    .step + .step { margin-top: 16px; }
+    .step-num {
+      min-width: 32px;
+      height: 32px;
+      background: #09172A;
+      color: #C8A84B;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.8rem;
+    }
+    .step-content h3 { font-size: 0.9rem; margin-bottom: 2px; }
+    .step-content p  { font-size: 0.82rem; color: #6b7280; }
+
+    /* ── Tables ── */
+    table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; border: 1px solid #e5e9f0; }
+    th { background: #09172A; color: #C8A84B; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; padding: 10px 14px; text-align: left; }
+    td { padding: 10px 14px; font-size: 0.83rem; border-top: 1px solid #f0f2f5; vertical-align: top; }
+    tr:hover td { background: #fafbfc; }
+    code { font-family: 'Cascadia Code', 'Consolas', monospace; background: #f0f4f8; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; color: #1d4ed8; }
+
+    /* ── Services ── */
+    .service {
+      background: white;
+      border-radius: 10px;
+      padding: 16px 20px;
+      border: 1px solid #e5e9f0;
+      margin-bottom: 12px;
+    }
+    .service-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+    .service-label { font-weight: 700; font-size: 0.88rem; }
+    .service-file { font-size: 0.75rem; color: #9ca3af; font-family: monospace; }
+    .service p { font-size: 0.83rem; color: #4b5563; }
+
+    /* ── Stack pills ── */
+    .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pill {
+      background: #09172A;
+      color: #C8A84B;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 20px;
+    }
+
+    /* ── Env block ── */
+    .env-block {
+      background: #09172A;
+      color: #a0aec0;
+      border-radius: 10px;
+      padding: 20px 24px;
+      font-family: monospace;
+      font-size: 0.82rem;
+      line-height: 2;
+    }
+    .env-key { color: #C8A84B; }
+    .env-comment { color: #4b5563; }
+
+    /* ── Quick-start box ── */
+    .quickstart {
+      background: #09172A;
+      color: white;
+      border-radius: 12px;
+      padding: 24px 28px;
+    }
+    .quickstart h3 { color: #C8A84B; margin-bottom: 14px; font-size: 0.95rem; }
+    .cmd {
+      background: rgba(255,255,255,.06);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: #e2e8f0;
+      margin-bottom: 8px;
+    }
+    .cmd span { color: #C8A84B; }
+
+    /* ── Status tags ── */
+    .tag {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .tag-done    { background: #d1fae5; color: #065f46; }
+    .tag-pending { background: #fef3c7; color: #92400e; }
+
+    /* ── Separator ── */
+    .sep { border: none; border-top: 1px solid #e5e9f0; margin: 0; }
+
+    footer { text-align: center; padding: 20px; font-size: 0.78rem; color: #9ca3af; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Guita Coach</h1>
+  <p>Coach financiero personal con IA — overview técnico para el equipo</p>
+  <div class="badge">v0.1 · Mayo 2026</div>
+</header>
+
+<main>
+
+  <!-- ── QUÉ ES ── -->
+  <section>
+    <h2>¿Qué es?</h2>
+    <div class="grid-3">
+      <div class="card">
+        <div class="card-icon">💰</div>
+        <h3>Presupuesto en 3 franjas</h3>
+        <p>Divide el sueldo en Necesidades, Gustos y Ahorro según porcentajes configurables.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🤖</div>
+        <h3>Clasificación automática</h3>
+        <p>Clasifica transacciones por reglas locales y, si la confianza es baja, usa Claude AI.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔔</div>
+        <h3>Alertas inteligentes</h3>
+        <p>Avisa al 75% y 90% del límite de cada franja, con proyecciones a fin de mes.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📧</div>
+        <h3>Sincronización Gmail</h3>
+        <p>Parsea emails de pago automáticamente via OAuth para capturar transacciones.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">💳</div>
+        <h3>Mercado Pago</h3>
+        <p>Importa movimientos del mes vía OAuth con un solo clic desde la app.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📊</div>
+        <h3>Proyecciones</h3>
+        <p>Calcula el ritmo diario de gasto y predice si se superará el límite de la franja.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FLUJO DE USO ── -->
+  <section>
+    <h2>Flujo de uso</h2>
+    <div class="flow">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3>Onboarding</h3>
+          <p>El usuario ingresa su nombre, sueldo mensual y el % que asigna a cada franja (ej: 50/30/20).</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3>Dashboard</h3>
+          <p>Ve las 3 franjas con barras de progreso, alertas activas y las últimas transacciones del mes.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3>Sincronizar fuentes</h3>
+          <p>Conecta Gmail y/o Mercado Pago. Con un clic se importan y clasifican las transacciones automáticamente.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h3>Revisar &amp; corregir</h3>
+          <p>En la pantalla de Transacciones puede editar categorías. Cada corrección se guarda como regla personalizada.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <h3>Proyecciones</h3>
+          <p>La pantalla de Insights muestra si va a pasarse del límite en alguna franja antes de que termine el mes.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── ARQUITECTURA ── -->
+  <section>
+    <h2>Arquitectura</h2>
+    <div class="grid-2" style="align-items:start">
+      <div>
+        <h3 style="margin-bottom:12px">Backend</h3>
+        <table>
+          <thead><tr><th>Archivo</th><th>Responsabilidad</th></tr></thead>
+          <tbody>
+            <tr><td><code>run.py</code></td><td>Punto de entrada único. Instala deps, crea DB, seedea demo, arranca server.</td></tr>
+            <tr><td><code>app/main.py</code></td><td>FastAPI app. Monta routers y sirve el frontend estático.</td></tr>
+            <tr><td><code>app/config.py</code></td><td>Variables de entorno via pydantic-settings.</td></tr>
+            <tr><td><code>app/models.py</code></td><td>Tablas SQLAlchemy: User, Transaction, Alert, Connection, CategoryRule.</td></tr>
+            <tr><td><code>app/database.py</code></td><td>SQLite engine, <code>init_db()</code>, dependencia <code>get_db()</code>.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <h3 style="margin-bottom:12px">Frontend</h3>
+        <table>
+          <thead><tr><th>Archivo</th><th>Responsabilidad</th></tr></thead>
+          <tbody>
+            <tr><td><code>static/index.html</code></td><td>SPA shell con sidebar y pantalla de onboarding.</td></tr>
+            <tr><td><code>static/js/api.js</code></td><td>Wrapper fetch centralizado para todos los endpoints.</td></tr>
+            <tr><td><code>static/js/dashboard.js</code></td><td>Franjas, barras de progreso, alertas, botón sync.</td></tr>
+            <tr><td><code>static/js/transactions.js</code></td><td>Tabla, filtros, modal para editar categoría, carga manual.</td></tr>
+            <tr><td><code>static/js/insights.js</code></td><td>Proyecciones y top gastos por franja.</td></tr>
+            <tr><td><code>static/js/settings.js</code></td><td>Conexiones OAuth y edición del presupuesto.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SERVICIOS (AGENTES) ── -->
+  <section>
+    <h2>Servicios / Agentes</h2>
+
+    <div class="service">
+      <div class="service-header">
+        <span class="service-label">🧠 Clasificador</span>
+        <span class="service-file">app/services/classifier.py</span>
+      </div>
+      <p>Clasifica cada transacción en tres pasos: (1) reglas del usuario con prioridad máxima, (2) reglas globales predefinidas para ~40 comercios argentinos, (3) Claude Sonnet como fallback cuando la confianza es menor a 85%. Responde en JSON con <code>category</code>, <code>subcategory</code>, <code>confidence</code> y <code>reason</code>.</p>
+    </div>
+
+    <div class="service">
+      <div class="service-header">
+        <span class="service-label">🔔 Motor de alertas</span>
+        <span class="service-file">app/services/alert_engine.py</span>
+      </div>
+      <p>Se ejecuta tras cada transacción nueva. Calcula el gasto acumulado por franja, lanza alerta <strong>warning</strong> al 75% y <strong>critical</strong> al 90%. Si Claude está disponible, agrega un consejo personalizado citando los gastos reales del usuario. También genera alertas de <em>proyección</em> si el ritmo diario excederá el límite.</p>
+    </div>
+
+    <div class="service">
+      <div class="service-header">
+        <span class="service-label">📧 Gmail</span>
+        <span class="service-file">app/services/gmail.py</span>
+      </div>
+      <p>Implementa el flujo OAuth 2.0 con Google. Busca emails de pago en el mes actual, parsea montos y comercios, y los ingresa como transacciones para clasificar.</p>
+    </div>
+
+    <div class="service">
+      <div class="service-header">
+        <span class="service-label">💳 Mercado Pago</span>
+        <span class="service-file">app/services/mercadopago.py</span>
+      </div>
+      <p>Flujo OAuth con MP. Obtiene los movimientos del mes actual y los normaliza al mismo formato de Transaction que el resto de las fuentes.</p>
+    </div>
+
+    <div class="service">
+      <div class="service-header">
+        <span class="service-label">🌱 Seed de demo</span>
+        <span class="service-file">app/services/seed.py</span>
+      </div>
+      <p>Carga 13 transacciones de ejemplo del mes actual para demostrar la app sin necesidad de credenciales reales. Solo corre si la DB está vacía.</p>
+    </div>
+  </section>
+
+  <!-- ── API ENDPOINTS ── -->
+  <section>
+    <h2>API endpoints</h2>
+    <table>
+      <thead>
+        <tr><th>Método</th><th>Ruta</th><th>Qué hace</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>GET</code></td><td><code>/api/budget/current</code></td><td>Franjas del mes con gasto actual, límites y alertas activas</td></tr>
+        <tr><td><code>POST</code></td><td><code>/api/budget/onboarding</code></td><td>Configuración inicial (nombre, sueldo, porcentajes)</td></tr>
+        <tr><td><code>PATCH</code></td><td><code>/api/budget/settings</code></td><td>Actualizar presupuesto después del onboarding</td></tr>
+        <tr><td><code>GET</code></td><td><code>/api/transactions</code></td><td>Listar transacciones con filtros (categoría, búsqueda, mes)</td></tr>
+        <tr><td><code>POST</code></td><td><code>/api/transactions</code></td><td>Agregar transacción manual</td></tr>
+        <tr><td><code>PATCH</code></td><td><code>/api/transactions/{id}/category</code></td><td>Corregir categoría y guardar regla personalizada</td></tr>
+        <tr><td><code>GET</code></td><td><code>/api/insights/month</code></td><td>Proyecciones de gasto por franja para el mes actual</td></tr>
+        <tr><td><code>GET</code></td><td><code>/api/insights/summary</code></td><td>Histórico de los últimos 3 meses</td></tr>
+        <tr><td><code>POST</code></td><td><code>/api/sync/gmail</code></td><td>Sincronizar transacciones desde Gmail</td></tr>
+        <tr><td><code>POST</code></td><td><code>/api/sync/mp</code></td><td>Sincronizar movimientos de Mercado Pago</td></tr>
+        <tr><td><code>GET</code></td><td><code>/api/auth/gmail</code></td><td>Iniciar OAuth con Google</td></tr>
+        <tr><td><code>GET</code></td><td><code>/api/auth/gmail/callback</code></td><td>Callback OAuth Google → guarda token</td></tr>
+        <tr><td><code>GET</code></td><td><code>/api/auth/mp</code></td><td>Iniciar OAuth con Mercado Pago</td></tr>
+        <tr><td><code>GET</code></td><td><code>/api/auth/mp/callback</code></td><td>Callback OAuth MP → guarda token</td></tr>
+        <tr><td><code>POST</code></td><td><code>/api/auth/disconnect/{provider}</code></td><td>Desconectar Gmail o Mercado Pago</td></tr>
+        <tr><td><code>GET</code></td><td><code>/api/docs</code></td><td>Swagger UI interactivo</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ── STACK ── -->
+  <section>
+    <h2>Stack técnico</h2>
+    <div class="pills">
+      <span class="pill">Python 3.x</span>
+      <span class="pill">FastAPI 0.115</span>
+      <span class="pill">SQLAlchemy 2.0</span>
+      <span class="pill">SQLite</span>
+      <span class="pill">Anthropic SDK 0.40</span>
+      <span class="pill">claude-sonnet-4</span>
+      <span class="pill">httpx</span>
+      <span class="pill">pydantic-settings</span>
+      <span class="pill">Vanilla JS</span>
+      <span class="pill">Google OAuth 2.0</span>
+      <span class="pill">MercadoPago OAuth</span>
+    </div>
+  </section>
+
+  <!-- ── VARIABLES DE ENTORNO ── -->
+  <section>
+    <h2>Variables de entorno (.env)</h2>
+    <div class="env-block">
+      <div><span class="env-comment"># Claude AI — clasificación inteligente</span></div>
+      <div><span class="env-key">CLAUDE_API_KEY</span>=sk-ant-...</div>
+      <br>
+      <div><span class="env-comment"># Gmail OAuth</span></div>
+      <div><span class="env-key">GOOGLE_CLIENT_ID</span>=...apps.googleusercontent.com</div>
+      <div><span class="env-key">GOOGLE_CLIENT_SECRET</span>=GOCSPX-...</div>
+      <br>
+      <div><span class="env-comment"># Mercado Pago OAuth</span></div>
+      <div><span class="env-key">MP_CLIENT_ID</span>=...</div>
+      <div><span class="env-key">MP_CLIENT_SECRET</span>=...</div>
+      <br>
+      <div><span class="env-comment"># Servidor</span></div>
+      <div><span class="env-key">APP_URL</span>=http://localhost:8000</div>
+      <div><span class="env-key">DEMO_MODE</span>=true &nbsp;<span class="env-comment"># false en producción</span></div>
+    </div>
+    <p style="margin-top:12px; font-size:0.82rem; color:#6b7280">La app funciona en modo demo sin ninguna API key. Solo se necesitan las credenciales para conectar fuentes reales.</p>
+  </section>
+
+  <!-- ── QUICKSTART ── -->
+  <section>
+    <h2>Cómo arrancar</h2>
+    <div class="quickstart">
+      <h3>Setup en 2 pasos</h3>
+      <div class="cmd"><span># 1. Clonar / descomprimir el proyecto e ir a la carpeta</span><br>cd guita-coach</div>
+      <div class="cmd"><span># 2. Arrancar todo (instala deps, crea DB, carga demo, levanta server)</span><br>python run.py</div>
+      <div class="cmd"><span># 3. Abrir en el browser</span><br>http://localhost:8000</div>
+    </div>
+  </section>
+
+  <!-- ── ESTADO ── -->
+  <section>
+    <h2>Estado del proyecto</h2>
+    <table>
+      <thead><tr><th>Módulo</th><th>Estado</th><th>Notas</th></tr></thead>
+      <tbody>
+        <tr><td>Backend (FastAPI + routers)</td><td><span class="tag tag-done">Listo</span></td><td>Todos los endpoints funcionando</td></tr>
+        <tr><td>Frontend SPA</td><td><span class="tag tag-done">Listo</span></td><td>Dashboard, Transacciones, Insights, Settings</td></tr>
+        <tr><td>Clasificador (reglas + IA)</td><td><span class="tag tag-done">Listo</span></td><td>Funciona sin API key (solo reglas)</td></tr>
+        <tr><td>Motor de alertas</td><td><span class="tag tag-done">Listo</span></td><td>Consejos IA opcionales</td></tr>
+        <tr><td>Sincronización Gmail</td><td><span class="tag tag-done">Listo</span></td><td>Requiere credenciales Google OAuth</td></tr>
+        <tr><td>Sincronización Mercado Pago</td><td><span class="tag tag-done">Listo</span></td><td>Requiere credenciales MP</td></tr>
+        <tr><td>Webhook Mercado Pago (real-time)</td><td><span class="tag tag-pending">Pendiente</span></td><td>Mejora futura</td></tr>
+        <tr><td>Chat con el coach (conversacional)</td><td><span class="tag tag-pending">Pendiente</span></td><td>Mejora futura</td></tr>
+        <tr><td>Export CSV</td><td><span class="tag tag-pending">Pendiente</span></td><td>Mejora futura</td></tr>
+        <tr><td>Deploy (Railway / Render)</td><td><span class="tag tag-pending">Pendiente</span></td><td>Mejora futura</td></tr>
+        <tr><td>Cifrado de tokens en DB</td><td><span class="tag tag-pending">Pendiente</span></td><td>Requerido antes de producción</td></tr>
+        <tr><td>Multi-usuario</td><td><span class="tag tag-pending">Pendiente</span></td><td>Si escala</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+</main>
+
+<footer>Guita Coach · Overview generado el 14 de mayo de 2026</footer>
+
+</body>
+</html>
