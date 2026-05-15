@@ -2,7 +2,9 @@
 Mercado Pago OAuth + lectura de movimientos.
 Requiere: MP_CLIENT_ID, MP_CLIENT_SECRET
 """
-from datetime import datetime, date
+import httpx
+from datetime import datetime, date, timedelta
+from typing import List, Dict
 from ..config import get_settings
 
 def get_oauth_url(state: str) -> str:
@@ -30,40 +32,86 @@ async def exchange_code(code: str) -> dict:
         r.raise_for_status()
         return r.json()
 
-async def fetch_movements(access_token: str) -> list[dict]:
-    """Trae movimientos del mes actual."""
-    import httpx
-    now = date.today()
-    begin = date(now.year, now.month, 1).isoformat()
-
+async def fetch_movements(access_token: str, days_back: int = 30) -> List[Dict]:
+    """Fetches both outgoing payments and incoming collections from Mercado Pago."""
     headers = {"Authorization": f"Bearer {access_token}"}
+    since = (datetime.utcnow() - timedelta(days=days_back)).strftime("%Y-%m-%dT00:00:00.000-00:00")
     results = []
 
-    async with httpx.AsyncClient() as client:
-        # Pagos realizados
-        r = await client.get(
-            "https://api.mercadopago.com/v1/payments/search",
-            params={"begin_date": f"{begin}T00:00:00.000-03:00", "end_date": "NOW",
-                    "sort": "date_created", "criteria": "desc", "limit": 100},
-            headers=headers,
-        )
-        if r.status_code == 200:
-            for p in r.json().get("results", []):
-                if p.get("operation_type") in ("regular_payment", "money_transfer"):
-                    merchant = (
-                        p.get("description") or
-                        p.get("merchant_order", {}).get("external_reference") or
-                        "Pago Mercado Pago"
-                    )
-                    results.append({
-                        "merchant": merchant,
-                        "amount": abs(float(p.get("transaction_amount", 0))),
-                        "date": p.get("date_created", "")[:10],
-                        "provider": "Mercado Pago",
-                        "source": "mercadopago",
-                        "raw_reference": p.get("id"),
-                        "confidence": 0.9,
-                    })
+    # Egresos: pagos realizados
+    url_payments = "https://api.mercadopago.com/v1/payments/search"
+    offset = 0
+    while True:
+        resp = httpx.get(url_payments, headers=headers, params={
+            "sort": "date_approved", "criteria": "desc",
+            "range": "date_approved", "begin_date": since,
+            "limit": 50, "offset": offset
+        })
+        data = resp.json()
+        items = data.get("results", [])
+        if not items:
+            break
+        for item in items:
+            if item.get("status") != "approved":
+                continue
+            raw_date = item.get("date_approved", "")[:10]
+            results.append({
+                "id": f"mp_{item['id']}",
+                "source": "mercadopago",
+                "tx_type": "expense",
+                "amount": float(item.get("transaction_amount", 0)),
+                "currency": item.get("currency_id", "ARS"),
+                "date": raw_date,
+                "month": raw_date[:7],
+                "merchant": item.get("description") or item.get("payment_method_id", ""),
+                "provider": "MercadoPago",
+                "needs_review": False,
+                "raw_reference": str(item),
+            })
+        total = data.get("paging", {}).get("total", 0)
+        offset += 50
+        if offset >= total:
+            break
+
+    # Ingresos: cobros recibidos
+    url_collections = "https://api.mercadopago.com/v1/collections/search"
+    offset = 0
+    while True:
+        resp = httpx.get(url_collections, headers=headers, params={
+            "sort": "date_approved", "criteria": "desc",
+            "range": "date_approved", "begin_date": since,
+            "limit": 50, "offset": offset
+        })
+        data = resp.json()
+        items = data.get("results", [])
+        if not items:
+            break
+        for item in items:
+            if item.get("status") != "approved":
+                continue
+            raw_date = item.get("date_approved", "")[:10]
+            is_transfer = item.get("payment_type_id") == "money_transfer"
+            description = item.get("description", "").strip()
+            needs_review = is_transfer and not description
+            payer_email = (item.get("payer") or {}).get("email", "")
+            merchant = description or payer_email or "Transferencia recibida"
+            results.append({
+                "id": f"mp_col_{item['id']}",
+                "source": "mercadopago",
+                "tx_type": "income",
+                "amount": float(item.get("transaction_amount", 0)),
+                "currency": item.get("currency_id", "ARS"),
+                "date": raw_date,
+                "month": raw_date[:7],
+                "merchant": merchant,
+                "provider": "MercadoPago",
+                "needs_review": needs_review,
+                "raw_reference": str(item),
+            })
+        total = data.get("paging", {}).get("total", 0)
+        offset += 50
+        if offset >= total:
+            break
 
     return results
 
