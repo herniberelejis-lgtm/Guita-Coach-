@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from .models import Base
 
@@ -7,8 +7,24 @@ DATABASE_URL = "sqlite:///./guita.db"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+def _run_migrations():
+    """Applies additive SQLite migrations safely (idempotent)."""
+    migrations = [
+        "ALTER TABLE transactions ADD COLUMN tx_type VARCHAR DEFAULT 'expense'",
+    ]
+    with engine.connect() as conn:
+        for sql in migrations:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception as e:
+                msg = str(e).lower()
+                if "duplicate column" not in msg and "already exists" not in msg:
+                    raise
+
 def init_db():
     Base.metadata.create_all(bind=engine)
+    _run_migrations()
     _ensure_user()
     _ensure_connections()
 

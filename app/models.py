@@ -47,6 +47,7 @@ class Transaction(Base):
     ai_reason = Column(Text)
     raw_reference = Column(Text)
     needs_review = Column(Boolean, default=False)
+    tx_type = Column(String, default="expense")   # "expense" | "income"
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class Alert(Base):
