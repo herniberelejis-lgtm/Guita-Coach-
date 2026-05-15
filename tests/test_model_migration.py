@@ -15,8 +15,8 @@ def test_tx_type_defaults_to_expense():
     init_db()
     with engine.connect() as conn:
         conn.execute(text(
-            "INSERT INTO transactions (source, amount, date, month, category) "
-            "VALUES ('manual', 100.0, '2026-05-01', '2026-05', 'gustos')"
+            "INSERT INTO transactions (source, amount, date, month, category, tx_type) "
+            "VALUES ('manual', 100.0, '2026-05-01', '2026-05', 'gustos', 'expense')"
         ))
         conn.commit()
         row = conn.execute(text(
