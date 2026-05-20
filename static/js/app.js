@@ -7,6 +7,7 @@ const App = {
     dashboard:    () => Dashboard.render(),
     transactions: () => Transactions.render(),
     insights:     () => Insights.render(),
+    chat:         () => Chat.render(),
     settings:     () => Settings.render(),
   },
 

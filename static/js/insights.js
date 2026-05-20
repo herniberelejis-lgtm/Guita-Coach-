@@ -1,4 +1,4 @@
-/* Insights page — proyecciones y resumen */
+/* Insights page — franjas con limite diario + comercios frecuentes */
 const Insights = {
   async render() {
     const main = document.getElementById('main');
@@ -16,151 +16,171 @@ const Insights = {
     sp.style.cssText = 'display:block;margin:80px auto;';
     main.appendChild(sp);
 
-    const [insights, history] = await Promise.all([
-      API.getInsights().catch(e => ({ error: e.message })),
-      API.getBudgetHistory().catch(() => []),
+    const month = new Date().toISOString().slice(0, 7);
+
+    const [insights, budget] = await Promise.all([
+      API.getInsights().catch(() => null),
+      API.getBudget().catch(() => null),
     ]);
 
     main.removeChild(sp);
 
-    if (insights.error) {
+    if (!insights) {
       const msg = document.createElement('div');
       msg.className = 'card';
       msg.style.color = 'var(--muted)';
-      msg.textContent = insights.error;
+      msg.textContent = 'No hay datos para mostrar este mes.';
       main.appendChild(msg);
       return;
     }
 
-    // Summary stats
-    const grid = document.createElement('div');
-    grid.className = 'grid-3';
-    grid.style.marginBottom = '24px';
-    [
-      [App.fmt(insights.total_spent), 'Gastado este mes'],
-      [insights.days_remaining + ' días', 'Hasta fin de mes'],
-      [insights.days_to_payday + ' días', 'Para el próximo cobro'],
-    ].forEach(([val, lbl]) => {
+    // Top stat: daily allowance global
+    if (insights.daily_allowance != null) {
       const pill = document.createElement('div');
-      pill.className = 'stat-pill';
-      const inner = document.createElement('div');
+      pill.className = 'card';
+      pill.style.cssText = 'margin-bottom:20px;display:flex;align-items:center;gap:16px;padding:20px;';
+      const icon = document.createElement('div');
+      icon.style.cssText = 'font-size:1.5rem;font-weight:800;color:var(--ok);min-width:40px;text-align:center;';
+      icon.textContent = '$';
+      const txt = document.createElement('div');
       const v = document.createElement('div');
-      v.className = 'val'; v.textContent = val;
+      v.style.cssText = 'font-size:1.5rem;font-weight:700;color:var(--ok);';
+      v.textContent = App.fmt(insights.daily_allowance) + '/día';
       const l = document.createElement('div');
-      l.className = 'lbl'; l.textContent = lbl;
-      inner.appendChild(v); inner.appendChild(l);
-      pill.appendChild(inner);
-      grid.appendChild(pill);
-    });
-    main.appendChild(grid);
+      l.style.cssText = 'font-size:.82rem;color:var(--muted);margin-top:2px;';
+      l.textContent = 'Disponible diario · ' + (insights.days_remaining || 0) + ' días restantes';
+      txt.appendChild(v);
+      txt.appendChild(l);
+      pill.appendChild(icon);
+      pill.appendChild(txt);
+      main.appendChild(pill);
+    }
 
-    // Per-franja projection cards
-    const secTitle = document.createElement('p');
-    secTitle.className = 'section-title';
-    secTitle.textContent = 'Proyección por franja';
-    main.appendChild(secTitle);
+    // Franjas
+    const LABELS = { necesidades: 'Necesidades', gustos: 'Gustos', ahorro: 'Ahorro' };
+    const COLORS = { necesidades: '#3B82F6', gustos: '#A855F7', ahorro: 'var(--ok)' };
 
-    const franjaGrid = document.createElement('div');
-    franjaGrid.className = 'grid-3';
-    franjaGrid.style.marginBottom = '24px';
+    const franjasTitle = document.createElement('p');
+    franjasTitle.className = 'section-title';
+    franjasTitle.textContent = 'Franjas del mes';
+    main.appendChild(franjasTitle);
 
-    const labels = { necesidades: 'Necesidades', gustos: 'Gustos', ahorro: 'Ahorro' };
-    for (const [cat, f] of Object.entries(insights.franjas)) {
+    (insights.franjas || []).forEach(function(f) {
+      const pct = f.limit > 0 ? Math.round(f.spent / f.limit * 100) : 0;
+      const cls = pct >= 90 ? 'danger' : pct >= 75 ? 'warn' : 'ok';
+
       const card = document.createElement('div');
       card.className = 'card';
+      card.style.marginBottom = '16px';
 
-      const cardTitle = document.createElement('h3');
-      cardTitle.style.marginBottom = '12px';
-      cardTitle.style.color = 'var(--gold)';
-      cardTitle.textContent = labels[cat];
-      card.appendChild(cardTitle);
+      // Header row
+      const hdr = document.createElement('div');
+      hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;';
+      const name = document.createElement('span');
+      name.style.fontWeight = '600';
+      name.textContent = LABELS[f.category] || f.category;
+      const pctLbl = document.createElement('span');
+      pctLbl.style.cssText = 'font-size:.85rem;font-weight:600;color:var(--' + cls + ');';
+      pctLbl.textContent = pct + '%';
+      hdr.appendChild(name);
+      hdr.appendChild(pctLbl);
+      card.appendChild(hdr);
 
-      const rows = [
-        ['Gastado', App.fmt(f.spent)],
-        ['Límite', App.fmt(f.limit)],
-        ['Ritmo diario', App.fmt(f.daily_rate) + '/día'],
-        ['Proyección', App.fmt(f.projected_total)],
-      ];
-      rows.forEach(([l, v]) => {
+      // Progress bar
+      const barBg = document.createElement('div');
+      barBg.style.cssText = 'background:rgba(255,255,255,.08);border-radius:99px;height:8px;margin-bottom:14px;overflow:hidden;';
+      const barFill = document.createElement('div');
+      barFill.style.cssText = 'height:100%;border-radius:99px;transition:width .4s;background:' + (COLORS[f.category] || '#888') + ';width:' + Math.min(pct, 100) + '%;';
+      barBg.appendChild(barFill);
+      card.appendChild(barBg);
+
+      // Stats row
+      const stats = document.createElement('div');
+      stats.style.cssText = 'display:flex;gap:20px;flex-wrap:wrap;font-size:.82rem;color:var(--muted);margin-bottom:12px;';
+      [
+        'Gastado: ' + App.fmt(f.spent),
+        'Límite: ' + App.fmt(f.limit),
+        'Resta: ' + App.fmt(f.remaining),
+      ].forEach(function(txt) {
+        const s = document.createElement('span');
+        s.textContent = txt;
+        stats.appendChild(s);
+      });
+      // Daily allowance highlight
+      const daily = document.createElement('span');
+      daily.style.cssText = 'color:var(--ok);font-weight:600;';
+      daily.textContent = App.fmt(f.daily_allowance) + '/día disponible';
+      stats.appendChild(daily);
+      card.appendChild(stats);
+
+      // Advice button
+      const adviceBtn = document.createElement('button');
+      adviceBtn.className = 'btn btn-ghost btn-sm';
+      adviceBtn.textContent = 'Pedir consejo IA';
+      const adviceBox = document.createElement('div');
+      adviceBox.style.cssText = 'display:none;margin-top:12px;padding:12px;background:var(--navy3);border-radius:8px;font-size:.85rem;line-height:1.55;color:var(--white);';
+
+      adviceBtn.addEventListener('click', async function() {
+        adviceBtn.disabled = true;
+        adviceBtn.textContent = 'Consultando…';
+        try {
+          const res = await fetch('/api/advisor/advice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ month: month, focus: f.category }),
+          });
+          const d = await res.json();
+          adviceBox.textContent = d.advice;
+          adviceBox.style.display = 'block';
+        } catch (_) {
+          adviceBox.textContent = 'No se pudo obtener el consejo. Intentá de nuevo.';
+          adviceBox.style.display = 'block';
+        } finally {
+          adviceBtn.disabled = false;
+          adviceBtn.textContent = 'Pedir consejo IA';
+        }
+      });
+
+      card.appendChild(adviceBtn);
+      card.appendChild(adviceBox);
+      main.appendChild(card);
+    });
+
+    // Frequent merchants
+    if (insights.frequent_merchants && insights.frequent_merchants.length > 0) {
+      const freqTitle = document.createElement('p');
+      freqTitle.className = 'section-title';
+      freqTitle.textContent = 'Tus hábitos este mes';
+      main.appendChild(freqTitle);
+
+      const freqCard = document.createElement('div');
+      freqCard.className = 'card';
+
+      insights.frequent_merchants.forEach(function(m, i) {
         const row = document.createElement('div');
-        row.style.cssText = 'display:flex;justify-content:space-between;font-size:.88rem;margin-bottom:6px;';
-        const lbl = document.createElement('span');
-        lbl.style.color = 'var(--muted)';
-        lbl.textContent = l;
-        const val = document.createElement('span');
-        val.style.fontWeight = '600';
-        val.textContent = v;
-        row.appendChild(lbl); row.appendChild(val);
-        card.appendChild(row);
+        row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 0;' +
+          (i < insights.frequent_merchants.length - 1 ? 'border-bottom:1px solid rgba(255,255,255,.06);' : '');
+
+        const left = document.createElement('div');
+        const mName = document.createElement('div');
+        mName.style.fontWeight = '500';
+        mName.textContent = m.merchant;
+        const mCount = document.createElement('div');
+        mCount.style.cssText = 'font-size:.78rem;color:var(--muted);margin-top:2px;';
+        mCount.textContent = m.count + ' veces este mes';
+        left.appendChild(mName);
+        left.appendChild(mCount);
+
+        const right = document.createElement('div');
+        right.style.cssText = 'font-weight:600;text-align:right;';
+        right.textContent = App.fmt(m.total);
+
+        row.appendChild(left);
+        row.appendChild(right);
+        freqCard.appendChild(row);
       });
 
-      if (f.will_exceed) {
-        const warn = document.createElement('div');
-        warn.style.cssText = 'margin-top:10px;padding:8px 12px;background:rgba(224,82,82,.1);border-radius:6px;font-size:.8rem;color:var(--danger);';
-        warn.textContent = 'Va a superar el límite este mes';
-        card.appendChild(warn);
-      }
-
-      if (f.top_merchants?.length) {
-        const hr = document.createElement('hr');
-        hr.className = 'divider';
-        card.appendChild(hr);
-        const topTitle = document.createElement('p');
-        topTitle.style.cssText = 'font-size:.75rem;color:var(--muted);margin-bottom:8px;';
-        topTitle.textContent = 'Top gastos';
-        card.appendChild(topTitle);
-        f.top_merchants.forEach(m => {
-          const mRow = document.createElement('div');
-          mRow.style.cssText = 'display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:4px;';
-          const mn = document.createElement('span');
-          mn.textContent = m.merchant;
-          const ma = document.createElement('span');
-          ma.style.color = 'var(--muted)';
-          ma.textContent = App.fmt(m.amount);
-          mRow.appendChild(mn); mRow.appendChild(ma);
-          card.appendChild(mRow);
-        });
-      }
-
-      franjaGrid.appendChild(card);
-    }
-    main.appendChild(franjaGrid);
-
-    // Historical comparison
-    if (history.length > 1) {
-      const histTitle = document.createElement('p');
-      histTitle.className = 'section-title';
-      histTitle.textContent = 'Histórico (últimos meses)';
-      main.appendChild(histTitle);
-
-      const histCard = document.createElement('div');
-      histCard.className = 'card';
-
-      const table = document.createElement('table');
-      table.className = 'tx-table';
-      const thead = table.createTHead();
-      const hr = thead.insertRow();
-      ['Mes', 'Total', 'Necesidades', 'Gustos', 'Ahorro'].forEach(h => {
-        const th = document.createElement('th');
-        th.textContent = h;
-        hr.appendChild(th);
-      });
-      const tbody = table.createTBody();
-      history.forEach(m => {
-        const tr = tbody.insertRow();
-        [
-          m.month,
-          App.fmt(m.total),
-          App.fmt(m.by_category?.necesidades || 0),
-          App.fmt(m.by_category?.gustos || 0),
-          App.fmt(m.by_category?.ahorro || 0),
-        ].forEach(val => {
-          const td = tr.insertCell();
-          td.textContent = val;
-        });
-      });
-      histCard.appendChild(table);
-      main.appendChild(histCard);
+      main.appendChild(freqCard);
     }
   },
 };

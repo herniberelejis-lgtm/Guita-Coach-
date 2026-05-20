@@ -53,38 +53,41 @@ async def exchange_code(code: str) -> dict:
         r.raise_for_status()
         return r.json()
 
-async def fetch_payment_emails(access_token: str, max_results: int = 50) -> list[dict]:
+async def fetch_payment_emails(access_token: str, max_results: int = 100) -> list[dict]:
     """Busca emails de confirmación de pagos en Gmail."""
     import httpx
-    query = "subject:(pago OR compra OR factura OR confirmación OR pagaste) newer_than:31d"
+    query = (
+        "(pago OR compra OR factura OR confirmación OR pagaste OR "
+        "recibiste OR acreditaron OR transferencia OR débito OR cobro) newer_than:31d"
+    )
     headers = {"Authorization": f"Bearer {access_token}"}
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=30) as client:
         r = await client.get(
             "https://gmail.googleapis.com/gmail/v1/users/me/messages",
             params={"q": query, "maxResults": max_results},
             headers=headers,
         )
         if r.status_code != 200:
-            raise Exception(f"Gmail API error: {r.status_code}")
+            raise Exception(f"Gmail API error {r.status_code}: {r.text}")
 
         messages = r.json().get("messages", [])
         results = []
 
-        for msg in messages[:20]:  # limitar para no gastar quota
+        for msg in messages[:50]:
             detail = await client.get(
                 f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg['id']}",
                 params={"format": "full"},
                 headers=headers,
             )
             if detail.status_code == 200:
-                parsed = _parse_email(detail.json())
+                parsed = _parse_email(detail.json(), gmail_id=msg["id"])
                 if parsed:
                     results.append(parsed)
 
     return results
 
-def _parse_email(msg: dict) -> Optional[dict]:
+def _parse_email(msg: dict, gmail_id: str = "") -> Optional[dict]:
     headers = {h["name"].lower(): h["value"] for h in msg.get("payload", {}).get("headers", [])}
     subject = headers.get("subject", "")
     date_str = headers.get("date", "")
@@ -95,6 +98,8 @@ def _parse_email(msg: dict) -> Optional[dict]:
     text = f"{subject}\n{snippet}\n{full_text}"
 
     # Check income first
+    unique_id = f"gmail_{gmail_id}" if gmail_id else subject
+
     if _is_income_email(text):
         amounts = re.findall(r'\$([\d\.]+(?:,\d{1,2})?)', text)
         amount = max((_parse_amount(a) for a in amounts), default=0.0)
@@ -106,7 +111,7 @@ def _parse_email(msg: dict) -> Optional[dict]:
                 "provider": "Gmail",
                 "source": "gmail",
                 "tx_type": "income",
-                "raw_reference": subject,
+                "raw_reference": unique_id,
                 "confidence": 0.85,
             }
 
@@ -114,11 +119,13 @@ def _parse_email(msg: dict) -> Optional[dict]:
     result = _try_parse_mercadopago(text, subject, date_str, sender)
     if result:
         result.setdefault("tx_type", "expense")
+        result["raw_reference"] = unique_id
         return result
 
     result = _try_parse_generic(text, subject, date_str, sender)
     if result:
         result.setdefault("tx_type", "expense")
+        result["raw_reference"] = unique_id
     return result
 
 def _extract_body(msg: dict) -> str:

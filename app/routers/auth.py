@@ -34,6 +34,9 @@ async def gmail_callback(code: str, state: str, db: Session = Depends(get_db)):
     tokens = await exchange_code(code)
 
     conn = db.query(Connection).filter_by(provider="gmail").first()
+    if not conn:
+        conn = Connection(user_id=1, provider="gmail")
+        db.add(conn)
     conn.status = "connected"
     conn.access_token = tokens.get("access_token")
     conn.refresh_token = tokens.get("refresh_token")
@@ -63,6 +66,9 @@ async def mp_callback(code: str, state: str, db: Session = Depends(get_db)):
     tokens = await exchange_code(code)
 
     conn = db.query(Connection).filter_by(provider="mercadopago").first()
+    if not conn:
+        conn = Connection(user_id=1, provider="mercadopago")
+        db.add(conn)
     conn.status = "connected"
     conn.access_token = tokens.get("access_token")
     conn.refresh_token = tokens.get("refresh_token")

@@ -44,4 +44,8 @@ const API = {
 
   // Auth
   disconnectProvider: (p) => API.post(`/auth/disconnect/${p}`),
+
+  // Chat
+  getChatStarters: () => API.get('/chat/starters'),
+  sendChat: (d) => API.post('/chat', d),
 };

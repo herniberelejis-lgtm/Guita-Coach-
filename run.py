@@ -49,7 +49,8 @@ if __name__ == "__main__":
     load_dotenv()
 
     init_db()
-    seed_demo()
+    if os.getenv("DEMO_MODE", "true").lower() == "true":
+        seed_demo()
 
     port = int(os.getenv("PORT", 8000))
     print(f"\n✅ Abrí: http://localhost:{port}\n")

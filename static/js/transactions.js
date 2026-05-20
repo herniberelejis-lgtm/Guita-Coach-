@@ -132,14 +132,23 @@ const Transactions = {
       wrap.textContent = '';
       if (!items.length) return;
       const notice = document.createElement('div');
-      notice.className = 'alert-item warning';
-      notice.style.marginBottom = '16px';
-      notice.textContent = items.length + ' transacciones necesitan revisión de categoría. ';
-      const link = document.createElement('a');
-      link.href = '#';
-      link.textContent = 'Revisar ahora';
-      link.onclick = (e) => { e.preventDefault(); Transactions.showReviewModal(items); };
-      notice.appendChild(link);
+      notice.className = 'card';
+      notice.style.cssText = 'margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border:1px solid rgba(245,158,11,.2);';
+
+      const left = document.createElement('div');
+      const countBadge = document.createElement('span');
+      countBadge.style.cssText = 'background:var(--warn);color:#000;font-weight:700;border-radius:99px;padding:2px 10px;font-size:.8rem;margin-right:10px;';
+      countBadge.textContent = String(items.length);
+      left.appendChild(countBadge);
+      left.appendChild(document.createTextNode('transacciones sin categoría'));
+
+      const reviewBtn = document.createElement('button');
+      reviewBtn.className = 'btn btn-primary btn-sm';
+      reviewBtn.textContent = 'Categorizar';
+      reviewBtn.onclick = function() { Transactions.showReviewModal(items); };
+
+      notice.appendChild(left);
+      notice.appendChild(reviewBtn);
       wrap.appendChild(notice);
     } catch (_) { /* ignore */ }
   },

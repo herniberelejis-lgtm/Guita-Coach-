@@ -68,67 +68,17 @@ def classify_by_rules(merchant: str, db: Session) -> Optional[dict]:
 
     return None
 
-async def classify_with_claude(merchant: str, amount: float, source: str) -> dict:
-    from ..config import get_settings
-    settings = get_settings()
-    if not settings.claude_enabled:
-        return {"category": None, "subcategory": None, "confidence": 0.3,
-                "rule_used": "none", "ai_reason": "Claude API no configurada"}
-
-    import anthropic
-    client = anthropic.Anthropic(api_key=settings.claude_api_key)
-
-    prompt = f"""Clasificá este gasto de un usuario argentino en una de las tres franjas.
-
-Comercio: {merchant}
-Monto: ${amount:,.0f} ARS
-Fuente: {source}
-
-Franjas:
-- necesidades: gastos esenciales (alquiler, supermercado, servicios, transporte, salud)
-- gustos: gastos discrecionales (delivery, restaurantes, ropa, entretenimiento, suscripciones)
-- ahorro: separación de plata para ahorro
-
-Referencias argentinas:
-SUBE=Transporte/necesidades, Rappi/PedidosYa=Delivery/gustos, Coto/DÍA/Carrefour=Supermercado/necesidades,
-Spotify/Netflix=Streaming/gustos, EDENOR/METROGAS/AYSA=Servicios/necesidades, Zara/ropa=Compras/gustos
-
-Respondé SOLO con JSON válido, sin texto adicional:
-{{
-  "category": "necesidades" | "gustos" | "ahorro",
-  "subcategory": "string",
-  "confidence": 0.0-1.0,
-  "reason": "explicación corta en español rioplatense"
-}}"""
-
-    try:
-        msg = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=256,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        data = json.loads(msg.content[0].text)
-        return {
-            "category": data.get("category"),
-            "subcategory": data.get("subcategory"),
-            "confidence": float(data.get("confidence", 0.8)),
-            "rule_used": "claude",
-            "ai_reason": data.get("reason", ""),
-        }
-    except Exception as e:
-        return {"category": None, "subcategory": None, "confidence": 0.0,
-                "rule_used": "error", "ai_reason": str(e)}
-
 async def classify(merchant: str, amount: float, source: str, db: Session) -> dict:
     result = classify_by_rules(merchant, db)
     if result and result["confidence"] >= 0.85:
         return result
 
-    claude_result = await classify_with_claude(merchant, amount, source)
-    if claude_result["confidence"] >= 0.85:
-        return claude_result
+    from . import ai_provider
+    ai_result = await ai_provider.classify(merchant, amount, source)
+    if ai_result.get("confidence", 0) >= 0.85:
+        return ai_result
 
     if result:
         return result
 
-    return claude_result | {"needs_review": True}
+    return (ai_result or {}) | {"needs_review": True}

@@ -118,6 +118,21 @@ function _buildDashboard(budget, insights) {
   );
   frag.appendChild(header);
 
+  // Summary metrics card
+  const summaryCard = _el('div', { className: 'summary-metrics' });
+  [
+    { label: 'Ingresos', value: App.fmt(budget.total_income || 0), cls: 'income' },
+    { label: 'Egresos', value: App.fmt(budget.total_expenses || 0), cls: 'expense' },
+    { label: 'Balance', value: App.fmt(budget.balance || 0), cls: (budget.balance || 0) >= 0 ? 'positive' : 'negative' },
+    { label: 'Pendientes', value: String(budget.pending_count || 0), cls: 'pending' },
+  ].forEach(function(m) {
+    summaryCard.appendChild(_el('div', { className: 'metric-box ' + m.cls },
+      _el('span', { className: 'metric-label' }, m.label),
+      _el('span', { className: 'metric-value' }, m.value)
+    ));
+  });
+  frag.appendChild(summaryCard);
+
   // Franjas
   const grid = _el('div', { className: 'grid-3', style: 'margin-bottom:24px;' });
   budget.franjas.forEach(f => grid.appendChild(_buildFranjaCard(f)));
