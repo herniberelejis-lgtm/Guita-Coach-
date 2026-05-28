@@ -1,0 +1,30 @@
+# Variables de entorno — NUNCA subir al repo
+.env
+*.env
+
+# Base de datos local
+*.db
+*.sqlite
+*.sqlite3
+
+# Credenciales OAuth
+google_credentials.json
+token.json
+*_token.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
