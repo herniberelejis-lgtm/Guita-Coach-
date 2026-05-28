@@ -3,7 +3,10 @@ Proveedor de IA abstracto. Selecciona Gemini o Claude según AI_PROVIDER en .env
 Expone: classify(), get_advice(), chat()
 """
 import json
+import logging
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT_CHAT = """Sos un asesor financiero personal argentino, directo, empatico y sin vueltas.
 
@@ -63,8 +66,8 @@ async def classify(merchant: str, amount: float, source: str) -> dict:
             return await _classify_claude(merchant, amount, source, settings)
         elif settings.gemini_enabled:
             return await _classify_gemini(merchant, amount, source, settings)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("classify failed for %r: %s", merchant, e)
     return {"category": None, "subcategory": None, "confidence": 0.0,
             "rule_used": "error", "ai_reason": "IA no disponible"}
 
@@ -91,8 +94,8 @@ async def _classify_gemini(merchant: str, amount: float, source: str, settings) 
 
 async def _classify_claude(merchant: str, amount: float, source: str, settings) -> dict:
     import anthropic
-    client = anthropic.Anthropic(api_key=settings.claude_api_key)
-    msg = client.messages.create(
+    client = anthropic.AsyncAnthropic(api_key=settings.claude_api_key)
+    msg = await client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=256,
         messages=[{"role": "user", "content": _classify_prompt(merchant, amount, source)}],
@@ -134,8 +137,8 @@ async def get_advice(patterns: dict, focus: str, income: float) -> Optional[str]
             return await _advice_claude(patterns, focus, income, settings)
         elif settings.gemini_enabled:
             return await _advice_gemini(patterns, focus, income, settings)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("get_advice failed for focus=%r: %s", focus, e)
     return None
 
 
@@ -149,8 +152,8 @@ async def _advice_gemini(patterns: dict, focus: str, income: float, settings) ->
 
 async def _advice_claude(patterns: dict, focus: str, income: float, settings) -> str:
     import anthropic
-    client = anthropic.Anthropic(api_key=settings.claude_api_key)
-    msg = client.messages.create(
+    client = anthropic.AsyncAnthropic(api_key=settings.claude_api_key)
+    msg = await client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=200,
         messages=[{"role": "user", "content": _advice_prompt(patterns, focus, income)}],
@@ -167,8 +170,8 @@ async def chat(message: str, history: list, financial_context: str) -> Optional[
             return await _chat_claude(message, history, financial_context, settings)
         elif settings.gemini_enabled:
             return await _chat_gemini(message, history, financial_context, settings)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("chat failed: %s", e)
     return None
 
 
@@ -202,8 +205,8 @@ async def _chat_claude(message: str, history: list, financial_context: str, sett
         if role in ("user", "assistant") and content:
             messages.append({"role": role, "content": content})
     messages.append({"role": "user", "content": message})
-    client = anthropic.Anthropic(api_key=settings.claude_api_key)
-    resp = client.messages.create(
+    client = anthropic.AsyncAnthropic(api_key=settings.claude_api_key)
+    resp = await client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=400,
         system=system,

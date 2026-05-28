@@ -79,14 +79,15 @@ def month_insights(db: Session = Depends(get_db)):
     total_spent = sum(t.amount for t in expense_txs)
     total_budget = income
 
-    # Frequent merchants (top 5 by count, expense only)
-    merchant_counts = Counter(t.merchant for t in expense_txs if t.merchant)
+    # Frequent merchants (top 5 by count, expense only) — one pass for totals
+    merchant_counts = Counter()
+    merchant_totals: dict = {}
+    for t in expense_txs:
+        if t.merchant:
+            merchant_counts[t.merchant] += 1
+            merchant_totals[t.merchant] = merchant_totals.get(t.merchant, 0) + t.amount
     frequent_merchants = [
-        {
-            "merchant": m,
-            "count": c,
-            "total": sum(t.amount for t in expense_txs if t.merchant == m),
-        }
+        {"merchant": m, "count": c, "total": merchant_totals[m]}
         for m, c in merchant_counts.most_common(5)
     ]
 
@@ -131,6 +132,7 @@ def summary_stats(db: Session = Depends(get_db)):
         txs = db.query(Transaction).filter(
             Transaction.user_id == 1,
             Transaction.month == month,
+            Transaction.tx_type == "expense",
             Transaction.status.in_(["confirmed", "classified"]),
         ).all()
         if not txs:

@@ -15,7 +15,8 @@ class ManualTransaction(BaseModel):
     merchant: str
     amount: float
     date: str
-    category: str
+    tx_type: str = "expense"
+    category: str = ""
     subcategory: str = ""
 
 
@@ -70,24 +71,44 @@ def list_needs_review(db: Session = Depends(get_db)):
 
 @router.post("")
 async def add_manual_transaction(payload: ManualTransaction, db: Session = Depends(get_db)):
+    if payload.tx_type == "income":
+        category = "ingreso"
+        subcategory = payload.subcategory or ""
+        confidence = 1.0
+        needs_review = False
+    else:
+        if payload.category:
+            category = payload.category
+            subcategory = payload.subcategory
+            confidence = 1.0
+            needs_review = False
+        else:
+            from ..services.classifier import classify
+            result = await classify(payload.merchant, payload.amount, "manual", db)
+            category = result.get("category") or "gustos"
+            subcategory = result.get("subcategory", "")
+            confidence = result.get("confidence", 0.7)
+            needs_review = not category
+
     tx = Transaction(
         user_id=1,
         source="manual",
+        tx_type=payload.tx_type,
         provider="Manual",
         merchant=payload.merchant,
         amount=payload.amount,
         date=payload.date,
         month=payload.date[:7],
-        category=payload.category,
-        subcategory=payload.subcategory,
+        category=category,
+        subcategory=subcategory,
         status="confirmed",
-        confidence=1.0,
-        needs_review=False,
+        confidence=confidence,
+        needs_review=needs_review,
     )
     db.add(tx)
     db.commit()
     db.refresh(tx)
-    await run_alert_engine(1, db)
+    run_alert_engine(1, db)
     return _tx_dict(tx)
 
 
@@ -108,7 +129,7 @@ async def correct_category(
     tx.rule_used = "manual_correction"
 
     if payload.save_rule:
-        pattern = tx.merchant.lower().split()[0] if tx.merchant else ""
+        pattern = tx.merchant.lower().strip() if tx.merchant else ""
         if pattern:
             existing = db.query(CategoryRule).filter_by(
                 user_id=1, pattern=pattern
@@ -147,6 +168,7 @@ def _tx_dict(t: Transaction) -> dict:
         "amount": t.amount,
         "date": t.date,
         "month": t.month,
+        "tx_type": t.tx_type,
         "category": t.category,
         "subcategory": t.subcategory,
         "source": t.source,

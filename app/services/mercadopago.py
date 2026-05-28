@@ -120,14 +120,14 @@ async def fetch_movements(access_token: str, days_back: int = 30) -> List[Dict]:
 
     return results
 
-async def refresh_token(refresh_token: str) -> dict:
+async def refresh_token(token: str) -> dict:
     import httpx
     settings = get_settings()
     async with httpx.AsyncClient() as client:
         r = await client.post("https://api.mercadopago.com/oauth/token", data={
             "grant_type": "refresh_token",
             "client_secret": settings.mp_client_secret,
-            "refresh_token": refresh_token,
+            "refresh_token": token,
         })
         r.raise_for_status()
         return r.json()
