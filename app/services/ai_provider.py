@@ -59,15 +59,41 @@ Respondé SOLO con JSON válido, sin texto adicional:
 }}"""
 
 
+_quota_cooldown_until = 0.0
+
+
+def _in_cooldown() -> bool:
+    import time
+    return time.time() < _quota_cooldown_until
+
+
+def _start_cooldown(seconds: float = 300) -> None:
+    global _quota_cooldown_until
+    import time
+    _quota_cooldown_until = time.time() + seconds
+
+
+def _is_quota_error(e: Exception) -> bool:
+    msg = str(e)
+    return "429" in msg or "quota" in msg.lower() or "rate" in msg.lower()
+
+
 async def classify(merchant: str, amount: float, source: str) -> dict:
     settings = _get_settings()
+    if _in_cooldown():
+        return {"category": None, "subcategory": None, "confidence": 0.0,
+                "rule_used": "cooldown", "ai_reason": "IA en pausa por límite de cuota"}
     try:
         if settings.ai_provider == "claude" and settings.claude_enabled:
             return await _classify_claude(merchant, amount, source, settings)
         elif settings.gemini_enabled:
             return await _classify_gemini(merchant, amount, source, settings)
     except Exception as e:
-        logger.warning("classify failed for %r: %s", merchant, e)
+        if _is_quota_error(e):
+            _start_cooldown()
+            logger.warning("classify: cuota de IA agotada, pausa 5 min")
+        else:
+            logger.warning("classify failed for %r: %s", merchant, e)
     return {"category": None, "subcategory": None, "confidence": 0.0,
             "rule_used": "error", "ai_reason": "IA no disponible"}
 

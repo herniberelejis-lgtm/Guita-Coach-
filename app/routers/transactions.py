@@ -86,7 +86,7 @@ async def add_manual_transaction(payload: ManualTransaction, db: Session = Depen
             needs_review = False
         else:
             from ..services.classifier import classify
-            result = await classify(payload.merchant, payload.amount, "manual", db)
+            result = await classify(payload.merchant, payload.amount, "manual", db, user_id=user.id)
             category = result.get("category") or "gustos"
             subcategory = result.get("subcategory", "")
             confidence = result.get("confidence", 0.7)

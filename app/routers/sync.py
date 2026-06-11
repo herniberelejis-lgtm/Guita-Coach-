@@ -55,6 +55,7 @@ async def _save_transaction_item(item: dict, user_id: int, db: Session) -> bool:
             item.get("amount", 0),
             source,
             db,
+            user_id=user_id,
         )
         tx = Transaction(
             user_id=user_id,

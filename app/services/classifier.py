@@ -52,10 +52,10 @@ GLOBAL_RULES = [
 def _normalize(s: str) -> str:
     return unicodedata.normalize("NFD", s.lower()).encode("ascii", "ignore").decode().strip()
 
-def classify_by_rules(merchant: str, db: Session) -> Optional[dict]:
+def classify_by_rules(merchant: str, db: Session, user_id: int = 1) -> Optional[dict]:
     n = _normalize(merchant)
 
-    user_rules = db.query(CategoryRule).filter_by(user_id=1).order_by(CategoryRule.priority.desc()).all()
+    user_rules = db.query(CategoryRule).filter_by(user_id=user_id).order_by(CategoryRule.priority.desc()).all()
     for rule in user_rules:
         if _normalize(rule.pattern) in n:
             return {"category": rule.category, "subcategory": rule.subcategory,
@@ -68,8 +68,8 @@ def classify_by_rules(merchant: str, db: Session) -> Optional[dict]:
 
     return None
 
-async def classify(merchant: str, amount: float, source: str, db: Session) -> dict:
-    result = classify_by_rules(merchant, db)
+async def classify(merchant: str, amount: float, source: str, db: Session, user_id: int = 1) -> dict:
+    result = classify_by_rules(merchant, db, user_id)
     if result and result["confidence"] >= 0.85:
         return result
 

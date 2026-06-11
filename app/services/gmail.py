@@ -53,12 +53,12 @@ async def exchange_code(code: str) -> dict:
         r.raise_for_status()
         return r.json()
 
-async def fetch_payment_emails(access_token: str, max_results: int = 100) -> list[dict]:
+async def fetch_payment_emails(access_token: str, max_results: int = 400) -> list[dict]:
     """Busca emails de confirmación de pagos en Gmail."""
     import httpx
     query = (
         "(pago OR compra OR factura OR confirmación OR pagaste OR "
-        "recibiste OR acreditaron OR transferencia OR débito OR cobro) newer_than:31d"
+        "recibiste OR acreditaron OR transferencia OR débito OR cobro) newer_than:180d"
     )
     headers = {"Authorization": f"Bearer {access_token}"}
 

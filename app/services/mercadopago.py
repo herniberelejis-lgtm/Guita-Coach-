@@ -32,7 +32,7 @@ async def exchange_code(code: str) -> dict:
         r.raise_for_status()
         return r.json()
 
-async def fetch_movements(access_token: str, days_back: int = 30) -> List[Dict]:
+async def fetch_movements(access_token: str, days_back: int = 180) -> List[Dict]:
     """Lee movimientos de Mercado Pago vía /v1/payments/search.
 
     Nota: /v1/collections/search fue dado de baja por MP (devuelve 404).
