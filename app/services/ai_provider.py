@@ -75,7 +75,7 @@ async def classify(merchant: str, amount: float, source: str) -> dict:
 async def _classify_gemini(merchant: str, amount: float, source: str, settings) -> dict:
     import google.generativeai as genai
     genai.configure(api_key=settings.gemini_api_key)
-    model = genai.GenerativeModel("gemini-2.0-flash-lite")
+    model = genai.GenerativeModel("gemini-flash-latest")
     response = model.generate_content(_classify_prompt(merchant, amount, source))
     text = response.text.strip()
     if text.startswith("```"):
@@ -145,7 +145,7 @@ async def get_advice(patterns: dict, focus: str, income: float) -> Optional[str]
 async def _advice_gemini(patterns: dict, focus: str, income: float, settings) -> str:
     import google.generativeai as genai
     genai.configure(api_key=settings.gemini_api_key)
-    model = genai.GenerativeModel("gemini-2.0-flash-lite")
+    model = genai.GenerativeModel("gemini-flash-latest")
     response = model.generate_content(_advice_prompt(patterns, focus, income))
     return response.text.strip()
 
@@ -179,7 +179,7 @@ async def _chat_gemini(message: str, history: list, financial_context: str, sett
     import google.generativeai as genai
     genai.configure(api_key=settings.gemini_api_key)
     system = SYSTEM_PROMPT_CHAT.format(context=financial_context)
-    model = genai.GenerativeModel("gemini-2.0-flash-lite", system_instruction=system)
+    model = genai.GenerativeModel("gemini-flash-latest", system_instruction=system)
 
     gemini_history = []
     for turn in history[-10:]:

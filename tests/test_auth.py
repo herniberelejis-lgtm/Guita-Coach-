@@ -34,7 +34,7 @@ def client():
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as c:
+    with TestClient(app, base_url="https://testserver") as c:
         yield c
     app.dependency_overrides.clear()
     db_mod.engine, db_mod.SessionLocal = _orig_engine, _orig_session
