@@ -9,6 +9,38 @@ from ..security import get_current_user
 
 router = APIRouter(prefix="/api/insights", tags=["insights"])
 
+# ─── Cotización dólar (cache 10 min) ────────────────────────────────────────
+_dolar_cache: dict = {"at": None, "data": None}
+
+
+@router.get("/dolar")
+async def dolar():
+    """Cotización blue/oficial desde dolarapi.com, cacheada 10 minutos."""
+    import httpx
+    from datetime import datetime, timedelta
+    now = datetime.utcnow()
+    if _dolar_cache["at"] and now - _dolar_cache["at"] < timedelta(minutes=10):
+        return _dolar_cache["data"]
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            r = await client.get("https://dolarapi.com/v1/dolares")
+            r.raise_for_status()
+            rates = {d["casa"]: d for d in r.json()}
+        data = {
+            "blue": {"compra": rates.get("blue", {}).get("compra"),
+                     "venta": rates.get("blue", {}).get("venta")},
+            "oficial": {"compra": rates.get("oficial", {}).get("compra"),
+                        "venta": rates.get("oficial", {}).get("venta")},
+            "updated_at": now.isoformat(),
+        }
+        _dolar_cache.update(at=now, data=data)
+        return data
+    except Exception:
+        if _dolar_cache["data"]:
+            return _dolar_cache["data"]
+        return {"blue": None, "oficial": None, "error": "Cotización no disponible"}
+
+
 
 @router.get("/month")
 def month_insights(db: Session = Depends(get_db), user: User = Depends(get_current_user)):

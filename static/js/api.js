@@ -52,4 +52,14 @@ const API = {
   // Chat
   getChatStarters: () => API.get('/chat/starters'),
   sendChat: (d) => API.post('/chat', d),
+
+  // Goals + recurring + dolar
+  getGoals:        ()       => API.get('/goals'),
+  createGoal:      (d)      => API.post('/goals', d),
+  contributeGoal:  (id, a)  => API.post(`/goals/${id}/contribute`, { amount: a }),
+  deleteGoal:      (id)     => API.delete(`/goals/${id}`),
+  getRecurring:    ()       => API.get('/goals/recurring'),
+  createRecurring: (d)      => API.post('/goals/recurring', d),
+  deleteRecurring: (id)     => API.delete(`/goals/recurring/${id}`),
+  getDolar:        ()       => API.get('/insights/dolar'),
 };

@@ -62,6 +62,8 @@ def _franja_data(user: User, txs: list, month: str, days_remaining: int = 1) -> 
 
 @router.get("/current")
 def get_current_budget(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    from ..services.recurring import apply_recurring
+    apply_recurring(db, user.id)
     month = date.today().strftime("%Y-%m")
     txs = db.query(Transaction).filter(
         Transaction.user_id == user.id,

@@ -55,6 +55,37 @@ class Transaction(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class Goal(Base):
+    """Meta de ahorro. parent_id permite submetas."""
+    __tablename__ = "goals"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True)
+    parent_id = Column(Integer, nullable=True)   # meta padre (submetas)
+    name = Column(String)
+    target_amount = Column(Float, default=0.0)
+    saved_amount = Column(Float, default=0.0)
+    currency = Column(String, default="ARS")     # ARS | USD
+    deadline = Column(String, nullable=True)     # YYYY-MM-DD
+    is_done = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class RecurringExpense(Base):
+    """Gasto fijo mensual o compra en cuotas (installments_total > 0)."""
+    __tablename__ = "recurring_expenses"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True)
+    merchant = Column(String)
+    amount = Column(Float)
+    category = Column(String, default="necesidades")
+    day_of_month = Column(Integer, default=1)
+    installments_total = Column(Integer, default=0)  # 0 = gasto fijo sin fin
+    installments_paid = Column(Integer, default=0)
+    active = Column(Boolean, default=True)
+    last_applied_month = Column(String, nullable=True)  # YYYY-MM
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class UserSession(Base):
     __tablename__ = "user_sessions"
     id = Column(Integer, primary_key=True, index=True)

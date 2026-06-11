@@ -13,6 +13,8 @@ const Auth = {
     document.getElementById('app').style.display = 'none';
     const ham = document.getElementById('hamburger');
     if (ham) ham.style.display = 'none';
+    const bnav = document.getElementById('bottom-nav');
+    if (bnav) bnav.style.display = 'none';
     const overlay = document.getElementById('auth-overlay');
     overlay.style.display = 'flex';
     this._bind(overlay);

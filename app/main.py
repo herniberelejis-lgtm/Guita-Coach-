@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 import os
 
 from .database import init_db
-from .routers import auth, budget, transactions, insights, sync, advisor, chat
+from .routers import auth, budget, transactions, insights, sync, advisor, chat, goals
 
 app = FastAPI(title="Guita Coach", version="0.1.0", docs_url="/api/docs")
 
@@ -33,11 +33,18 @@ app.include_router(insights.router)
 app.include_router(sync.router)
 app.include_router(advisor.router)
 app.include_router(chat.router)
+app.include_router(goals.router)
 
 # ─── Static frontend ─────────────────────────────────────────────────────────
 static_path = os.path.join(os.path.dirname(__file__), "..", "static")
 if os.path.isdir(static_path):
     app.mount("/static", StaticFiles(directory=static_path), name="static")
+
+@app.get("/sw.js", include_in_schema=False)
+async def service_worker():
+    return FileResponse(os.path.join(static_path, "sw.js"),
+                        media_type="application/javascript",
+                        headers={"Service-Worker-Allowed": "/"})
 
 @app.get("/{full_path:path}", include_in_schema=False)
 async def spa_fallback(full_path: str):
