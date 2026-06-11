@@ -22,6 +22,14 @@ const Auth = {
     if (this._bound) return;
     this._bound = true;
 
+    // Deshabilitar botones sociales que no están configurados en el server
+    API.get('/auth/providers').then(p => {
+      const g = document.getElementById('social-google');
+      const m = document.getElementById('social-mp');
+      if (g && !p.google) { g.disabled = true; g.title = 'Login con Google no configurado en este servidor'; }
+      if (m && !p.mercadopago) { m.disabled = true; m.title = 'Login con Mercado Pago no configurado en este servidor'; }
+    }).catch(() => {});
+
     overlay.querySelectorAll('[data-auth-tab]').forEach(tab => {
       tab.addEventListener('click', () => {
         overlay.querySelectorAll('[data-auth-tab]').forEach(t => t.classList.remove('active'));

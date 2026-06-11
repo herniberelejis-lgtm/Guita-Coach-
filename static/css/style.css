@@ -561,3 +561,22 @@ nav a svg { width: 18px; height: 18px; flex-shrink: 0; }
 /* ─── Badges de transferencia/duplicado ─────────────────────────────────── */
 .badge.transfer  { background: rgba(91,141,239,.15); color: #5B8DEF; }
 .badge.duplicate { background: rgba(148,163,184,.15); color: var(--muted); text-decoration: line-through; }
+
+/* ─── Login social ──────────────────────────────────────────────────────── */
+.auth-divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 22px 0 14px; color: var(--muted); font-size: .78rem;
+}
+.auth-divider::before, .auth-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--navy3);
+}
+.social-login { display: flex; flex-direction: column; gap: 8px; }
+.social-btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; padding: 11px; border-radius: 10px;
+  border: 1px solid var(--navy3); background: var(--bg);
+  color: var(--white); font-family: inherit; font-size: .88rem; font-weight: 600;
+  cursor: pointer; transition: var(--transition);
+}
+.social-btn:hover:not(:disabled) { border-color: var(--muted); background: var(--navy3); }
+.social-btn:disabled { opacity: .45; cursor: not-allowed; }

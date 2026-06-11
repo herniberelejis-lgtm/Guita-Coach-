@@ -11,7 +11,11 @@
    - `APP_URL` — la URL pública que te da Railway (ej. `https://guita.up.railway.app`)
    - `DEMO_MODE=false`
    - `GOOGLE_CLIENT_ID/SECRET`, `MP_CLIENT_ID/SECRET` cuando los tengas
-5. Actualizá los redirect URIs de Google y MP a `{APP_URL}/api/auth/...`.
+5. Actualizá los redirect URIs de Google y MP. Hay que registrar **cuatro**:
+   - Google: `{APP_URL}/api/auth/gmail/callback` (sync de comprobantes)
+     y `{APP_URL}/api/auth/google/login/callback` (botón "Continuar con Google")
+   - Mercado Pago: `{APP_URL}/api/auth/mp/callback` (sync wallet)
+     y `{APP_URL}/api/auth/mp/login/callback` (botón "Continuar con Mercado Pago")
 
 ## Checklist pre-lanzamiento (bloqueantes)
 

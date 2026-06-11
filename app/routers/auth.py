@@ -77,6 +77,148 @@ def me(user: User = Depends(get_current_user)):
     }
 
 
+# ─── Login social (Google / Mercado Pago) ───────────────────────────────────
+_login_states: set[str] = set()
+
+
+@router.get("/providers")
+def login_providers():
+    """Qué métodos de login social están disponibles según la config."""
+    settings = get_settings()
+    return {
+        "google": settings.gmail_enabled,
+        "mercadopago": settings.mp_enabled,
+        "bank": False,  # sin API pública de bancos en AR; ver docs/integraciones-bancarias.md
+    }
+
+
+def _login_state() -> str:
+    state = secrets.token_urlsafe(16)
+    _login_states.add(state)
+    return state
+
+
+def _check_login_state(state: str) -> None:
+    if state not in _login_states:
+        raise HTTPException(400, "Estado OAuth inválido")
+    _login_states.discard(state)
+
+
+def _find_or_create_user(db: Session, email: str, name: str) -> User:
+    email = email.lower().strip()
+    user = db.query(User).filter(User.email == email).first()
+    if user:
+        return user
+    user = User(name=name or email.split("@")[0], email=email, onboarding_done=False)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    for provider in ("gmail", "mercadopago"):
+        db.add(Connection(user_id=user.id, provider=provider))
+    db.commit()
+    return user
+
+
+@router.get("/google/login")
+def google_login():
+    settings = get_settings()
+    if not settings.gmail_enabled:
+        raise HTTPException(400, "Login con Google no configurado. Agregá GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en .env")
+    redirect = f"{settings.app_url}/api/auth/google/login/callback"
+    return RedirectResponse(
+        "https://accounts.google.com/o/oauth2/v2/auth"
+        f"?client_id={settings.google_client_id}"
+        f"&redirect_uri={redirect}"
+        "&response_type=code"
+        "&scope=openid%20email%20profile"
+        f"&state={_login_state()}"
+    )
+
+
+@router.get("/google/login/callback")
+async def google_login_callback(code: str, state: str, db: Session = Depends(get_db)):
+    _check_login_state(state)
+    import httpx
+    settings = get_settings()
+    async with httpx.AsyncClient(timeout=20) as client:
+        r = await client.post("https://oauth2.googleapis.com/token", data={
+            "code": code,
+            "client_id": settings.google_client_id,
+            "client_secret": settings.google_client_secret,
+            "redirect_uri": f"{settings.app_url}/api/auth/google/login/callback",
+            "grant_type": "authorization_code",
+        })
+        if r.status_code != 200:
+            raise HTTPException(502, "Google no aceptó el código de autorización")
+        access_token = r.json().get("access_token")
+        info = await client.get(
+            "https://openidconnect.googleapis.com/v1/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if info.status_code != 200:
+            raise HTTPException(502, "No se pudo leer el perfil de Google")
+        profile = info.json()
+
+    email = profile.get("email")
+    if not email:
+        raise HTTPException(400, "Google no devolvió un email")
+    user = _find_or_create_user(db, email, profile.get("name", ""))
+    response = RedirectResponse("/")
+    create_session(db, user.id, response)
+    return response
+
+
+@router.get("/mp/login")
+def mp_login():
+    settings = get_settings()
+    if not settings.mp_enabled:
+        raise HTTPException(400, "Login con Mercado Pago no configurado. Agregá MP_CLIENT_ID y MP_CLIENT_SECRET en .env")
+    redirect = f"{settings.app_url}/api/auth/mp/login/callback"
+    return RedirectResponse(
+        "https://auth.mercadopago.com/authorization"
+        f"?client_id={settings.mp_client_id}"
+        f"&redirect_uri={redirect}"
+        "&response_type=code"
+        f"&state={_login_state()}"
+    )
+
+
+@router.get("/mp/login/callback")
+async def mp_login_callback(code: str, state: str, db: Session = Depends(get_db)):
+    _check_login_state(state)
+    import httpx
+    settings = get_settings()
+    async with httpx.AsyncClient(timeout=20) as client:
+        r = await client.post("https://api.mercadopago.com/oauth/token", data={
+            "grant_type": "authorization_code",
+            "client_id": settings.mp_client_id,
+            "client_secret": settings.mp_client_secret,
+            "code": code,
+            "redirect_uri": f"{settings.app_url}/api/auth/mp/login/callback",
+        })
+        if r.status_code != 200:
+            raise HTTPException(502, "Mercado Pago no aceptó el código de autorización")
+        tokens = r.json()
+        info = await client.get(
+            "https://api.mercadopago.com/users/me",
+            headers={"Authorization": f"Bearer {tokens.get('access_token')}"},
+        )
+        if info.status_code != 200:
+            raise HTTPException(502, "No se pudo leer el perfil de Mercado Pago")
+        profile = info.json()
+
+    email = profile.get("email") or f"mp_{profile.get('id')}@mp.local"
+    name = f"{profile.get('first_name', '')} {profile.get('last_name', '')}".strip()
+    user = _find_or_create_user(db, email, name)
+
+    # Ya que el usuario autorizó MP, dejamos la wallet conectada para sync
+    _save_tokens(db, user.id, "mercadopago", tokens)
+
+    response = RedirectResponse("/")
+    create_session(db, user.id, response)
+    return response
+
+
 # ─── Estado OAuth: state → user_id ──────────────────────────────────────────
 _oauth_states: dict[str, int] = {}
 
