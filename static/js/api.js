@@ -62,4 +62,5 @@ const API = {
   createRecurring: (d)      => API.post('/goals/recurring', d),
   deleteRecurring: (id)     => API.delete(`/goals/recurring/${id}`),
   getDolar:        ()       => API.get('/insights/dolar'),
+  getCategories:   (month)  => API.get('/insights/categories' + (month ? '?month=' + month : '')),
 };

@@ -17,8 +17,12 @@ Tu marco de trabajo tiene TRES prioridades estrictas en este orden:
 
 Reglas de comunicacion:
 - Tono rioplatense informal pero profesional (vos, che, dale, etc.)
-- Respuestas cortas y concretas (maximo 4 oraciones por respuesta)
-- Siempre hace referencia a los numeros reales del usuario cuando los tenes
+- Respuestas cortas y concretas por defecto (3-4 oraciones). Si el usuario pide
+  un analisis de sus gastos, habitos o patrones, extendete lo necesario usando
+  los datos del contexto (historial, categorias, comercios, metas).
+- SIEMPRE fundamenta con los numeros reales del contexto: monto y nombre de
+  comercio o categoria concretos. Nunca inventes datos que no esten en el contexto.
+- Si detectas tendencias entre meses (sube/baja el gasto en algo), mencionalas.
 - No uses emojis
 - Arranca directo al punto, sin saludar
 
@@ -101,7 +105,7 @@ async def classify(merchant: str, amount: float, source: str) -> dict:
 async def _classify_gemini(merchant: str, amount: float, source: str, settings) -> dict:
     import google.generativeai as genai
     genai.configure(api_key=settings.gemini_api_key)
-    model = genai.GenerativeModel("gemini-flash-latest")
+    model = genai.GenerativeModel("gemini-2.5-flash-lite")
     response = model.generate_content(_classify_prompt(merchant, amount, source))
     text = response.text.strip()
     if text.startswith("```"):
@@ -171,7 +175,7 @@ async def get_advice(patterns: dict, focus: str, income: float) -> Optional[str]
 async def _advice_gemini(patterns: dict, focus: str, income: float, settings) -> str:
     import google.generativeai as genai
     genai.configure(api_key=settings.gemini_api_key)
-    model = genai.GenerativeModel("gemini-flash-latest")
+    model = genai.GenerativeModel("gemini-2.5-flash")
     response = model.generate_content(_advice_prompt(patterns, focus, income))
     return response.text.strip()
 
@@ -190,14 +194,23 @@ async def _advice_claude(patterns: dict, focus: str, income: float, settings) ->
 # ── Chat ────────────────────────────────────────────────────────────────────
 
 async def chat(message: str, history: list, financial_context: str) -> Optional[str]:
+    import asyncio
     settings = _get_settings()
-    try:
-        if settings.ai_provider == "claude" and settings.claude_enabled:
-            return await _chat_claude(message, history, financial_context, settings)
-        elif settings.gemini_enabled:
-            return await _chat_gemini(message, history, financial_context, settings)
-    except Exception as e:
-        logger.warning("chat failed: %s", e)
+    for attempt in (1, 2):
+        try:
+            if settings.ai_provider == "claude" and settings.claude_enabled:
+                return await _chat_claude(message, history, financial_context, settings)
+            elif settings.gemini_enabled:
+                return await _chat_gemini(message, history, financial_context, settings)
+            return None
+        except Exception as e:
+            if attempt == 1 and _is_quota_error(e):
+                # limite por minuto del tier gratis: esperar y reintentar una vez
+                logger.warning("chat: cuota por minuto agotada, reintento en 8s")
+                await asyncio.sleep(8)
+                continue
+            logger.warning("chat failed: %s", e)
+            return None
     return None
 
 
@@ -205,7 +218,7 @@ async def _chat_gemini(message: str, history: list, financial_context: str, sett
     import google.generativeai as genai
     genai.configure(api_key=settings.gemini_api_key)
     system = SYSTEM_PROMPT_CHAT.format(context=financial_context)
-    model = genai.GenerativeModel("gemini-flash-latest", system_instruction=system)
+    model = genai.GenerativeModel("gemini-2.5-flash", system_instruction=system)
 
     gemini_history = []
     for turn in history[-10:]:

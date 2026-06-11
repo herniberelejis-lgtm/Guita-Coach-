@@ -157,6 +157,19 @@ function _buildDashboard(budget, insights) {
     if (wrap) { wrap.textContent = ''; wrap.appendChild(_buildHistoryBars(hist)); }
   }).catch(() => {});
 
+  // Desglose por categoría (estilo MP)
+  const catCard = _el('div', { className: 'card', style: 'margin-bottom:24px;' },
+    _el('p', { className: 'section-title' }, 'Salidas por categoría'),
+    _el('div', { id: 'cat-breakdown' },
+      (() => { const s = document.createElement('div'); s.className = 'spinner'; s.style.cssText = 'display:block;margin:20px auto;'; return s; })()
+    )
+  );
+  frag.appendChild(catCard);
+  API.getCategories().then(data => {
+    const wrap = document.getElementById('cat-breakdown');
+    if (wrap) { wrap.textContent = ''; wrap.appendChild(_buildCategoryList(data)); }
+  }).catch(() => {});
+
   // Alerts
   if (budget.alerts?.length) {
     const alertsSection = _el('div', { style: 'margin-bottom:24px;' },
@@ -312,6 +325,37 @@ function _buildHistoryBars(hist) {
       _el('span', { className: 'hbar-total' }, App.fmt(totalSpent))
     ));
   });
+  return wrap;
+}
+
+const CAT_PALETTE = ['#84A98C', '#C97B4A', '#5B8DEF', '#B07BAC', '#D4A03C', '#6FA8A0', '#A0674B', '#8A9182'];
+
+/* Lista de subcategorías con barra proporcional, estilo app de MP. */
+function _buildCategoryList(data) {
+  if (!data.categories || !data.categories.length) {
+    return _el('div', { className: 'empty' }, 'Sin gastos este mes');
+  }
+  const wrap = _el('div', { className: 'cat-list' });
+  data.categories.slice(0, 10).forEach((c, i) => {
+    const color = c.name === 'Pendiente de categoría' ? '#9AA0A6' : CAT_PALETTE[i % CAT_PALETTE.length];
+    wrap.appendChild(_el('div', { className: 'cat-row' },
+      _el('span', { className: 'cat-dot', style: 'background:' + color }),
+      _el('div', { className: 'cat-info' },
+        _el('div', { className: 'cat-name' }, c.name),
+        _el('div', { className: 'cat-bar-track' },
+          _el('div', { className: 'cat-bar', style: 'width:' + c.pct + '%;background:' + color })
+        )
+      ),
+      _el('div', { className: 'cat-amounts' },
+        _el('div', { className: 'cat-amount' }, App.fmt(c.amount)),
+        _el('div', { className: 'cat-pct' }, c.pct + '% · ' + c.count + ' movs')
+      )
+    ));
+  });
+  wrap.appendChild(_el('div', { className: 'cat-total' },
+    _el('span', {}, 'Total del mes'),
+    _el('strong', {}, App.fmt(data.total))
+  ));
   return wrap;
 }
 
