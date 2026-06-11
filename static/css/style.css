@@ -709,3 +709,5 @@ html[data-theme="zen"] {
   color: var(--muted); font-size: .86rem;
 }
 .cat-total strong { color: var(--white); }
+
+.metric-sub { display: block; color: var(--muted); font-size: .68rem; margin-top: 3px; }

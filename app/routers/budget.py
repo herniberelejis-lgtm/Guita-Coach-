@@ -83,12 +83,21 @@ def get_current_budget(db: Session = Depends(get_db), user: User = Depends(get_c
     data["days_remaining"] = days_in_month - days_passed
 
     visible_txs = [t for t in txs if not getattr(t, 'is_internal_transfer', False) and not getattr(t, 'is_duplicate', False)]
-    total_income = sum(t.amount for t in visible_txs if getattr(t, 'tx_type', 'expense') == 'income')
+    tracked_income = sum(t.amount for t in visible_txs if getattr(t, 'tx_type', 'expense') == 'income')
     total_expenses = sum(t.amount for t in visible_txs if getattr(t, 'tx_type', 'expense') == 'expense')
+
+    # El sueldo declarado es el piso de ingresos del mes: si lo registrado
+    # (MP/Gmail/manual) no lo alcanza, se asume que el resto entra por canales
+    # no conectados (banco, efectivo). Si lo registrado lo supera, gana lo real.
+    declared_income = user.monthly_income or 0
+    total_income = max(tracked_income, declared_income)
     balance = total_income - total_expenses
     pending_count = sum(1 for t in txs if t.needs_review and t.status != "reviewed")
 
     data["total_income"] = total_income
+    data["tracked_income"] = tracked_income
+    data["declared_income"] = declared_income
+    data["income_is_declared"] = declared_income > tracked_income
     data["total_expenses"] = total_expenses
     data["balance"] = balance
     data["pending_count"] = pending_count
