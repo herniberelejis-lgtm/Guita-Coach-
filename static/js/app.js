@@ -200,7 +200,7 @@ const Theme = {
   },
 
   init() {
-    this.apply(localStorage.getItem('gc-theme') || 'neo');
+    this.apply(localStorage.getItem('gc-theme') || 'zen');
     const footer = document.querySelector('.sidebar-footer');
     if (!footer) return;
     const row = document.createElement('div');
