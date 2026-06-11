@@ -24,15 +24,32 @@ FAKE_TRANSFER_NO_DESC = {
     "status": "approved",
 }
 
-def _mock_mp_get(url, *args, **kwargs):
+async def _mock_mp_get(url, *args, **kwargs):
     mock = MagicMock()
+    mock.status_code = 200
     if "collections" in url:
         mock.json.return_value = {"results": [FAKE_COLLECTION, FAKE_TRANSFER_NO_DESC], "paging": {"total": 2}}
     else:
         mock.json.return_value = {"results": [], "paging": {"total": 0}}
     return mock
 
-@patch("app.services.mercadopago.httpx.get", side_effect=_mock_mp_get)
+
+def _mock_async_client(*args, **kwargs):
+    client = MagicMock()
+    client.get = _mock_mp_get
+
+    async def aenter(self_=None):
+        return client
+
+    async def aexit(*a):
+        return False
+
+    ctx = MagicMock()
+    ctx.__aenter__ = lambda self_: aenter()
+    ctx.__aexit__ = lambda self_, *a: aexit()
+    return ctx
+
+@patch("app.services.mercadopago.httpx.AsyncClient", side_effect=_mock_async_client)
 def test_collections_returned_as_income(mock_get):
     from app.services.mercadopago import fetch_movements
     import asyncio
@@ -41,7 +58,7 @@ def test_collections_returned_as_income(mock_get):
     assert len(incomes) >= 1
     assert incomes[0]["amount"] == 5000.0
 
-@patch("app.services.mercadopago.httpx.get", side_effect=_mock_mp_get)
+@patch("app.services.mercadopago.httpx.AsyncClient", side_effect=_mock_async_client)
 def test_money_transfer_no_desc_needs_review(mock_get):
     from app.services.mercadopago import fetch_movements
     import asyncio

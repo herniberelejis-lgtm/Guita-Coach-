@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..models import Transaction, CategoryRule
+from ..models import Transaction, CategoryRule, User
+from ..security import get_current_user
 from ..services.alert_engine import run_alert_engine
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
@@ -34,8 +35,9 @@ def list_transactions(
     limit: int = Query(50),
     offset: int = Query(0),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
-    q = db.query(Transaction).filter(Transaction.user_id == 1)
+    q = db.query(Transaction).filter(Transaction.user_id == user.id)
 
     if month:
         q = q.filter(Transaction.month == month)
@@ -61,16 +63,16 @@ def list_transactions(
 
 
 @router.get("/needs-review")
-def list_needs_review(db: Session = Depends(get_db)):
+def list_needs_review(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     txs = db.query(Transaction).filter(
-        Transaction.user_id == 1,
+        Transaction.user_id == user.id,
         Transaction.needs_review == True
     ).order_by(Transaction.date.desc()).all()
     return [_tx_dict(t) for t in txs]
 
 
 @router.post("")
-async def add_manual_transaction(payload: ManualTransaction, db: Session = Depends(get_db)):
+async def add_manual_transaction(payload: ManualTransaction, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     if payload.tx_type == "income":
         category = "ingreso"
         subcategory = payload.subcategory or ""
@@ -91,7 +93,7 @@ async def add_manual_transaction(payload: ManualTransaction, db: Session = Depen
             needs_review = not category
 
     tx = Transaction(
-        user_id=1,
+        user_id=user.id,
         source="manual",
         tx_type=payload.tx_type,
         provider="Manual",
@@ -108,7 +110,9 @@ async def add_manual_transaction(payload: ManualTransaction, db: Session = Depen
     db.add(tx)
     db.commit()
     db.refresh(tx)
-    run_alert_engine(1, db)
+    from ..services.dedup import mark_duplicates_and_transfers
+    mark_duplicates_and_transfers(db, user.id, tx.month)
+    run_alert_engine(user.id, db)
     return _tx_dict(tx)
 
 
@@ -117,8 +121,9 @@ async def correct_category(
     tx_id: int,
     payload: CategoryCorrection,
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
-    tx = db.query(Transaction).filter_by(id=tx_id, user_id=1).first()
+    tx = db.query(Transaction).filter_by(id=tx_id, user_id=user.id).first()
     if not tx:
         raise HTTPException(404, "Transacción no encontrada")
 
@@ -132,14 +137,14 @@ async def correct_category(
         pattern = tx.merchant.lower().strip() if tx.merchant else ""
         if pattern:
             existing = db.query(CategoryRule).filter_by(
-                user_id=1, pattern=pattern
+                user_id=user.id, pattern=pattern
             ).first()
             if existing:
                 existing.category = payload.category
                 existing.subcategory = payload.subcategory
             else:
                 db.add(CategoryRule(
-                    user_id=1,
+                    user_id=user.id,
                     pattern=pattern,
                     category=payload.category,
                     subcategory=payload.subcategory,
@@ -152,8 +157,8 @@ async def correct_category(
 
 
 @router.delete("/{tx_id}")
-def delete_transaction(tx_id: int, db: Session = Depends(get_db)):
-    tx = db.query(Transaction).filter_by(id=tx_id, user_id=1).first()
+def delete_transaction(tx_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    tx = db.query(Transaction).filter_by(id=tx_id, user_id=user.id).first()
     if not tx:
         raise HTTPException(404, "Transacción no encontrada")
     db.delete(tx)
@@ -175,6 +180,8 @@ def _tx_dict(t: Transaction) -> dict:
         "provider": t.provider,
         "confidence": t.confidence,
         "needs_review": t.needs_review,
+        "is_internal_transfer": bool(getattr(t, "is_internal_transfer", False)),
+        "is_duplicate": bool(getattr(t, "is_duplicate", False)),
         "ai_reason": t.ai_reason,
         "status": t.status,
     }

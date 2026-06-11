@@ -3,7 +3,9 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..models import Connection, Transaction
+from ..models import Connection, Transaction, User
+from ..security import get_current_user
+from ..services.dedup import find_cross_source_duplicate, mark_duplicates_and_transfers
 from ..services.classifier import classify
 from ..services.alert_engine import run_alert_engine
 
@@ -24,6 +26,8 @@ async def _save_transaction_item(item: dict, user_id: int, db: Session) -> bool:
         if exists:
             return False
 
+    dup = find_cross_source_duplicate(db, user_id, item)
+
     tx_type = item.get("tx_type", "expense")
 
     if tx_type == "income":
@@ -43,6 +47,7 @@ async def _save_transaction_item(item: dict, user_id: int, db: Session) -> bool:
             confidence=1.0,
             needs_review=item.get("needs_review", False),
             raw_reference=raw_ref,
+            is_duplicate=dup is not None,
         )
     else:
         result = await classify(
@@ -69,6 +74,7 @@ async def _save_transaction_item(item: dict, user_id: int, db: Session) -> bool:
             ai_reason=result.get("reason"),
             needs_review=item.get("needs_review", False) or result.get("needs_review", False),
             raw_reference=raw_ref,
+            is_duplicate=dup is not None,
         )
 
     db.add(tx)
@@ -86,8 +92,8 @@ async def _save_transactions(items: list[dict], user_id: int, db: Session) -> in
 
 
 @router.post("/gmail")
-async def sync_gmail(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    conn = db.query(Connection).filter_by(user_id=1, provider="gmail").first()
+async def sync_gmail(background_tasks: BackgroundTasks, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    conn = db.query(Connection).filter_by(user_id=user.id, provider="gmail").first()
     if not conn or conn.status != "connected" or not conn.access_token:
         raise HTTPException(400, "Gmail no conectado. Conectalo desde Configuración.")
 
@@ -97,19 +103,20 @@ async def sync_gmail(background_tasks: BackgroundTasks, db: Session = Depends(ge
     except Exception as e:
         raise HTTPException(502, f"Error al leer Gmail: {str(e)}")
 
-    saved = await _save_transactions(items, user_id=1, db=db)
+    saved = await _save_transactions(items, user_id=user.id, db=db)
 
     conn.last_sync = datetime.utcnow()
     db.commit()
+    flagged = mark_duplicates_and_transfers(db, user.id)
 
-    background_tasks.add_task(run_alert_engine, 1, db)
+    background_tasks.add_task(run_alert_engine, user.id, db)
 
-    return {"ok": True, "fetched": len(items), "saved": saved}
+    return {"ok": True, "fetched": len(items), "saved": saved, "flagged": flagged}
 
 
 @router.post("/mp")
-async def sync_mp(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    conn = db.query(Connection).filter_by(user_id=1, provider="mercadopago").first()
+async def sync_mp(background_tasks: BackgroundTasks, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    conn = db.query(Connection).filter_by(user_id=user.id, provider="mercadopago").first()
     if not conn or conn.status != "connected" or not conn.access_token:
         raise HTTPException(400, "Mercado Pago no conectado. Conectalo desde Configuración.")
 
@@ -119,19 +126,20 @@ async def sync_mp(background_tasks: BackgroundTasks, db: Session = Depends(get_d
     except Exception as e:
         raise HTTPException(502, f"Error al leer Mercado Pago: {str(e)}")
 
-    saved = await _save_transactions(items, user_id=1, db=db)
+    saved = await _save_transactions(items, user_id=user.id, db=db)
 
     conn.last_sync = datetime.utcnow()
     db.commit()
+    flagged = mark_duplicates_and_transfers(db, user.id)
 
-    background_tasks.add_task(run_alert_engine, 1, db)
+    background_tasks.add_task(run_alert_engine, user.id, db)
 
-    return {"ok": True, "fetched": len(items), "saved": saved}
+    return {"ok": True, "fetched": len(items), "saved": saved, "flagged": flagged}
 
 
 @router.get("/status")
-def sync_status(db: Session = Depends(get_db)):
-    conns = db.query(Connection).filter_by(user_id=1).all()
+def sync_status(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    conns = db.query(Connection).filter_by(user_id=user.id).all()
     return {
         c.provider: {
             "status": c.status,

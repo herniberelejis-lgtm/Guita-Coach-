@@ -43,6 +43,10 @@ const API = {
   syncStatus: () => API.get('/sync/status'),
 
   // Auth
+  register: (d) => API.post('/auth/register', d),
+  login:    (d) => API.post('/auth/login', d),
+  logout:   ()  => API.post('/auth/logout'),
+  me:       ()  => API.get('/auth/me'),
   disconnectProvider: (p) => API.post(`/auth/disconnect/${p}`),
 
   // Chat

@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Transaction, User
+from ..security import get_current_user
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -16,14 +17,15 @@ STARTERS = [
 ]
 
 
-def _load_financial_context(db: Session) -> dict:
+def _load_financial_context(db: Session, user: User) -> dict:
     from datetime import date
     month = date.today().strftime("%Y-%m")
 
-    user = db.query(User).filter_by(id=1).first()
     txs = db.query(Transaction).filter(
-        Transaction.user_id == 1,
+        Transaction.user_id == user.id,
         Transaction.month == month,
+        Transaction.is_internal_transfer == False,
+        Transaction.is_duplicate == False,
     ).all()
 
     income = sum(t.amount for t in txs if t.tx_type == "income")
@@ -104,14 +106,14 @@ def _rule_based_reply(message: str, ctx: dict) -> str:
 
 
 @router.post("")
-async def chat(body: dict, db: Session = Depends(get_db)):
+async def chat(body: dict, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     message = body.get("message", "").strip()
     history = body.get("history", [])
 
     if not message:
         return {"reply": "Mandame tu consulta y te ayudo."}
 
-    ctx = _load_financial_context(db)
+    ctx = _load_financial_context(db, user)
 
     from ..services import ai_provider
     reply = await ai_provider.chat(message, history, _format_context(ctx))

@@ -459,3 +459,105 @@ nav a svg { width: 18px; height: 18px; flex-shrink: 0; }
   font-size: .88rem;
   line-height: 1.55;
 }
+
+/* ─── Auth (login / registro) ───────────────────────────────────────────── */
+#auth-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 0%, rgba(34,197,94,.12), transparent),
+    radial-gradient(ellipse 50% 40% at 90% 100%, rgba(91,141,239,.10), transparent),
+    var(--bg);
+  padding: 20px;
+}
+.auth-box {
+  width: 100%; max-width: 400px;
+  background: var(--navy2);
+  border: 1px solid var(--navy3);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 36px 32px;
+}
+.auth-brand h1 { color: var(--white); font-size: 1.6rem; letter-spacing: -.02em; }
+.auth-brand p  { color: var(--muted); font-size: .9rem; margin: 6px 0 24px; }
+.auth-tabs {
+  display: flex; gap: 4px; margin-bottom: 22px;
+  background: var(--bg); border-radius: 10px; padding: 4px;
+}
+.auth-tabs button {
+  flex: 1; padding: 9px 0; border: 0; border-radius: 8px;
+  background: transparent; color: var(--muted);
+  font-family: inherit; font-size: .88rem; font-weight: 600; cursor: pointer;
+  transition: var(--transition);
+}
+.auth-tabs button.active { background: var(--navy3); color: var(--white); }
+.auth-submit { width: 100%; justify-content: center; padding: 13px; margin-top: 6px; }
+
+/* ─── Notificaciones (campana + panel) ──────────────────────────────────── */
+.bell-btn, .logout-btn {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 9px 10px; margin-bottom: 4px;
+  border: 0; border-radius: 8px; background: transparent;
+  color: var(--muted); font-family: inherit; font-size: .82rem;
+  cursor: pointer; transition: var(--transition); text-align: left;
+}
+.bell-btn:hover, .logout-btn:hover { background: var(--navy3); color: var(--white); }
+.bell-badge {
+  margin-left: auto; min-width: 18px; text-align: center;
+  background: var(--danger); color: #fff;
+  font-size: .65rem; font-weight: 700; border-radius: 99px; padding: 1px 6px;
+}
+.notif-panel {
+  position: fixed; left: 230px; bottom: 20px; z-index: 90;
+  width: 340px; max-height: 60vh; overflow-y: auto;
+  background: var(--navy2); border: 1px solid var(--navy3);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.notif-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 16px; border-bottom: 1px solid var(--navy3);
+  color: var(--white); position: sticky; top: 0; background: var(--navy2);
+}
+.notif-header button { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 1rem; }
+.notif-item { padding: 14px 16px; border-bottom: 1px solid var(--navy3); }
+.notif-item.critical { border-left: 3px solid var(--danger); }
+.notif-item.warning  { border-left: 3px solid var(--warn); }
+.notif-msg    { color: var(--white); font-size: .86rem; }
+.notif-advice { color: var(--muted); font-size: .8rem; margin-top: 6px; font-style: italic; }
+.notif-dismiss {
+  margin-top: 8px; background: none; border: 1px solid var(--navy3);
+  border-radius: 6px; color: var(--muted); font-size: .72rem;
+  padding: 4px 10px; cursor: pointer; transition: var(--transition);
+}
+.notif-dismiss:hover { color: var(--white); border-color: var(--muted); }
+.notif-empty { padding: 24px 16px; color: var(--muted); font-size: .85rem; text-align: center; }
+@media (max-width: 768px) {
+  .notif-panel { left: 12px; right: 12px; width: auto; }
+}
+
+/* ─── Gráficos del dashboard ───────────────────────────────────────────── */
+.charts-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;
+}
+@media (max-width: 900px) { .charts-row { grid-template-columns: 1fr; } }
+.chart-card { min-height: 220px; }
+.donut-wrap { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.donut { width: 150px; height: 150px; flex-shrink: 0; }
+.donut circle { transition: stroke-dasharray .6s ease; }
+.donut-center { fill: var(--white); font-size: 13px; font-weight: 700; font-family: var(--font-body); }
+.donut-legend { display: flex; flex-direction: column; gap: 8px; }
+.legend-item { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .82rem; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.history-bars { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.hbar-row { display: flex; align-items: center; gap: 10px; }
+.hbar-label { color: var(--muted); font-size: .76rem; width: 58px; flex-shrink: 0; }
+.hbar-track {
+  flex: 1; display: flex; height: 18px; border-radius: 5px;
+  overflow: hidden; background: var(--bg);
+}
+.hbar-seg { height: 100%; transition: width .5s ease; }
+.hbar-total { color: var(--white); font-size: .76rem; font-weight: 600; width: 80px; text-align: right; flex-shrink: 0; }
+
+/* ─── Badges de transferencia/duplicado ─────────────────────────────────── */
+.badge.transfer  { background: rgba(91,141,239,.15); color: #5B8DEF; }
+.badge.duplicate { background: rgba(148,163,184,.15); color: var(--muted); text-decoration: line-through; }

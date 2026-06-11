@@ -7,6 +7,8 @@ Base = declarative_base()
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=True)
+    password_hash = Column(String, nullable=True)
     name = Column(String, default="Hernán")
     monthly_income = Column(Float, default=0.0)
     necesidades_pct = Column(Float, default=50.0)
@@ -48,7 +50,18 @@ class Transaction(Base):
     raw_reference = Column(Text)
     needs_review = Column(Boolean, default=False)
     tx_type = Column(String, default="expense")   # "expense" | "income"
+    is_internal_transfer = Column(Boolean, default=False)  # transferencia entre cuentas propias
+    is_duplicate = Column(Boolean, default=False)          # duplicado de otra fuente
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class UserSession(Base):
+    __tablename__ = "user_sessions"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True)
+    token = Column(String, unique=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime)
 
 class Alert(Base):
     __tablename__ = "alerts"

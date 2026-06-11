@@ -11,6 +11,10 @@ def _run_migrations():
     """Applies additive SQLite migrations safely (idempotent)."""
     migrations = [
         "ALTER TABLE transactions ADD COLUMN tx_type VARCHAR DEFAULT 'expense'",
+        "ALTER TABLE transactions ADD COLUMN is_internal_transfer BOOLEAN DEFAULT 0",
+        "ALTER TABLE transactions ADD COLUMN is_duplicate BOOLEAN DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN email VARCHAR",
+        "ALTER TABLE users ADD COLUMN password_hash VARCHAR",
     ]
     with engine.connect() as conn:
         for sql in migrations:
@@ -25,8 +29,10 @@ def _run_migrations():
 def init_db():
     Base.metadata.create_all(bind=engine)
     _run_migrations()
-    _ensure_user()
-    _ensure_connections()
+    from .config import get_settings
+    if get_settings().demo_mode:
+        _ensure_user()
+        _ensure_connections()
 
 def _ensure_user():
     db = SessionLocal()

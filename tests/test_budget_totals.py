@@ -47,7 +47,7 @@ def test_budget_totals_fields(mem_db):
     with patch("app.routers.budget.date") as mock_date:
         mock_date.today.return_value = datetime.date(2026, 5, 14)
         mock_date.side_effect = lambda *args, **kw: datetime.date(*args, **kw)
-        result = get_current_budget(db=mem_db)
+        result = get_current_budget(db=mem_db, user=mem_db.query(User).first())
 
     assert result["total_income"] == 100000.0
     assert result["total_expenses"] == 25000.0

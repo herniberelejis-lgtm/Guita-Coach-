@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Transaction, User
+from ..security import get_current_user
 
 router = APIRouter(prefix="/api/advisor", tags=["advisor"])
 
@@ -13,6 +14,8 @@ def _get_patterns(db: Session, user_id: int, month: str) -> dict:
         Transaction.user_id == user_id,
         Transaction.month == month,
         Transaction.tx_type == "expense",
+        Transaction.is_internal_transfer == False,
+        Transaction.is_duplicate == False,
     ).all()
 
     by_freq = Counter(t.merchant for t in txs if t.merchant)
@@ -41,22 +44,21 @@ def _get_patterns(db: Session, user_id: int, month: str) -> dict:
 
 
 @router.get("/patterns")
-async def get_patterns(month: str = None, db: Session = Depends(get_db)):
+async def get_patterns(month: str = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     from datetime import date
     if not month:
         month = date.today().strftime("%Y-%m")
-    return _get_patterns(db, user_id=1, month=month)
+    return _get_patterns(db, user_id=user.id, month=month)
 
 
 @router.post("/advice")
-async def get_advice(body: dict, db: Session = Depends(get_db)):
+async def get_advice(body: dict, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     from datetime import date
     month = body.get("month") or date.today().strftime("%Y-%m")
     focus = body.get("focus", "gustos")
 
-    patterns = _get_patterns(db, user_id=1, month=month)
-    user = db.query(User).filter_by(id=1).first()
-    income = user.monthly_income if user else 0
+    patterns = _get_patterns(db, user_id=user.id, month=month)
+    income = user.monthly_income or 0
 
     from ..services import ai_provider
     advice = await ai_provider.get_advice(patterns, focus, income)

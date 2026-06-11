@@ -12,7 +12,15 @@ const App = {
   },
 
   async init() {
-    // Check onboarding
+    // 1. Sesión: si no hay usuario, mostrar login/registro
+    const user = await Auth.check();
+    if (!user) {
+      Auth.show();
+      return;
+    }
+    this.state.user = user;
+
+    // 2. Onboarding
     const budget = await API.getBudget().catch(() => null);
     if (!budget) return;
 
@@ -24,11 +32,61 @@ const App = {
     }
 
     this._bindNav();
+    this._bindNotifications(budget.alerts || []);
     this._handleHash();
     window.addEventListener('hashchange', () => this._handleHash());
 
     // Alert badge on nav
     this._updateAlertBadge(budget.alerts?.length || 0);
+  },
+
+  _bindNotifications(alerts) {
+    const bell = document.getElementById('notif-bell');
+    const panel = document.getElementById('notif-panel');
+    const badge = document.getElementById('bell-badge');
+    if (!bell || !panel) return;
+
+    const unread = alerts.length;
+    if (badge) {
+      badge.textContent = unread || '';
+      badge.style.display = unread ? 'inline-flex' : 'none';
+    }
+
+    bell.addEventListener('click', () => {
+      panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+      this._renderNotifications(alerts);
+    });
+  },
+
+  _renderNotifications(alerts) {
+    const list = document.getElementById('notif-list');
+    if (!list) return;
+    if (!alerts.length) {
+      list.innerHTML = '<div class="notif-empty">Sin notificaciones. Todo en orden 👌</div>';
+      return;
+    }
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    list.innerHTML = alerts.map(a => `
+      <div class="notif-item ${esc(a.severity)}">
+        <div class="notif-msg">${esc(a.message)}</div>
+        ${a.ai_advice ? `<div class="notif-advice">${esc(a.ai_advice)}</div>` : ''}
+        <button class="notif-dismiss" data-id="${Number(a.id)}">Marcar leída</button>
+      </div>
+    `).join('');
+    list.querySelectorAll('.notif-dismiss').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        await API.markAlertRead(btn.dataset.id).catch(() => {});
+        btn.closest('.notif-item').remove();
+        const remaining = list.querySelectorAll('.notif-item').length;
+        const badge = document.getElementById('bell-badge');
+        if (badge) {
+          badge.textContent = remaining || '';
+          badge.style.display = remaining ? 'inline-flex' : 'none';
+        }
+        App._updateAlertBadge(remaining);
+      });
+    });
   },
 
   _handleHash() {

@@ -5,14 +5,14 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import User, Transaction
+from ..security import get_current_user
 
 router = APIRouter(prefix="/api/insights", tags=["insights"])
 
 
 @router.get("/month")
-def month_insights(db: Session = Depends(get_db)):
-    user = db.query(User).filter_by(id=1).first()
-    if not user or not user.monthly_income:
+def month_insights(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    if not user.monthly_income:
         return {"error": "Configurá tu ingreso primero"}
 
     now = date.today()
@@ -28,12 +28,13 @@ def month_insights(db: Session = Depends(get_db)):
     days_remaining = days_in_month - days_passed
 
     txs = db.query(Transaction).filter(
-        Transaction.user_id == 1,
+        Transaction.user_id == user.id,
         Transaction.month == month,
         Transaction.status.in_(["confirmed", "classified"]),
     ).all()
 
-    expense_txs = [t for t in txs if getattr(t, 'tx_type', 'expense') == 'expense']
+    expense_txs = [t for t in txs if getattr(t, 'tx_type', 'expense') == 'expense'
+                   and not getattr(t, 'is_internal_transfer', False) and not getattr(t, 'is_duplicate', False)]
 
     limits = {
         "necesidades": income * user.necesidades_pct / 100,
@@ -110,10 +111,9 @@ def month_insights(db: Session = Depends(get_db)):
 
 
 @router.get("/summary")
-def summary_stats(db: Session = Depends(get_db)):
+def summary_stats(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """Últimos 3 meses de stats para comparar."""
-    user = db.query(User).filter_by(id=1).first()
-    if not user or not user.monthly_income:
+    if not user.monthly_income:
         return []
 
     now = date.today()
@@ -130,11 +130,12 @@ def summary_stats(db: Session = Depends(get_db)):
     result = []
     for month in months:
         txs = db.query(Transaction).filter(
-            Transaction.user_id == 1,
+            Transaction.user_id == user.id,
             Transaction.month == month,
             Transaction.tx_type == "expense",
             Transaction.status.in_(["confirmed", "classified"]),
         ).all()
+        txs = [t for t in txs if not getattr(t, 'is_internal_transfer', False) and not getattr(t, 'is_duplicate', False)]
         if not txs:
             continue
         result.append({

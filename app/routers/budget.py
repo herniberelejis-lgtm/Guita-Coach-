@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import User, Transaction, Alert
+from ..security import get_current_user
 
 router = APIRouter(prefix="/api/budget", tags=["budget"])
 
@@ -34,8 +35,9 @@ def _franja_data(user: User, txs: list, month: str, days_remaining: int = 1) -> 
         "gustos": income * user.gustos_pct / 100,
         "ahorro": income * user.ahorro_pct / 100,
     }
+    visible = [t for t in txs if not getattr(t, 'is_internal_transfer', False) and not getattr(t, 'is_duplicate', False)]
     spent = {
-        cat: sum(t.amount for t in txs if t.category == cat and getattr(t, 'tx_type', 'expense') == 'expense')
+        cat: sum(t.amount for t in visible if t.category == cat and getattr(t, 'tx_type', 'expense') == 'expense')
         for cat in limits
     }
     dr = max(days_remaining, 1)
@@ -59,14 +61,10 @@ def _franja_data(user: User, txs: list, month: str, days_remaining: int = 1) -> 
 
 
 @router.get("/current")
-def get_current_budget(db: Session = Depends(get_db)):
-    user = db.query(User).filter_by(id=1).first()
-    if not user:
-        raise HTTPException(404, "Usuario no encontrado")
-
+def get_current_budget(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     month = date.today().strftime("%Y-%m")
     txs = db.query(Transaction).filter(
-        Transaction.user_id == 1,
+        Transaction.user_id == user.id,
         Transaction.month == month,
         Transaction.status.in_(["confirmed", "classified"])
     ).all()
@@ -82,8 +80,9 @@ def get_current_budget(db: Session = Depends(get_db)):
     data["days_in_month"] = days_in_month
     data["days_remaining"] = days_in_month - days_passed
 
-    total_income = sum(t.amount for t in txs if getattr(t, 'tx_type', 'expense') == 'income')
-    total_expenses = sum(t.amount for t in txs if getattr(t, 'tx_type', 'expense') == 'expense')
+    visible_txs = [t for t in txs if not getattr(t, 'is_internal_transfer', False) and not getattr(t, 'is_duplicate', False)]
+    total_income = sum(t.amount for t in visible_txs if getattr(t, 'tx_type', 'expense') == 'income')
+    total_expenses = sum(t.amount for t in visible_txs if getattr(t, 'tx_type', 'expense') == 'expense')
     balance = total_income - total_expenses
     pending_count = sum(1 for t in txs if t.needs_review and t.status != "reviewed")
 
@@ -96,7 +95,7 @@ def get_current_budget(db: Session = Depends(get_db)):
     data["payday"] = user.payday
 
     alerts = db.query(Alert).filter(
-        Alert.user_id == 1,
+        Alert.user_id == user.id,
         Alert.is_read == False
     ).order_by(Alert.created_at.desc()).all()
 
@@ -117,11 +116,10 @@ def get_current_budget(db: Session = Depends(get_db)):
 
 
 @router.post("/onboarding")
-def complete_onboarding(payload: OnboardingPayload, db: Session = Depends(get_db)):
+def complete_onboarding(payload: OnboardingPayload, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     if payload.necesidades_pct + payload.gustos_pct + payload.ahorro_pct != 100:
         raise HTTPException(400, "Los porcentajes deben sumar 100")
 
-    user = db.query(User).filter_by(id=1).first()
     user.name = payload.name
     user.monthly_income = payload.monthly_income
     user.necesidades_pct = payload.necesidades_pct
@@ -134,8 +132,7 @@ def complete_onboarding(payload: OnboardingPayload, db: Session = Depends(get_db
 
 
 @router.patch("/settings")
-def update_budget_settings(payload: BudgetUpdatePayload, db: Session = Depends(get_db)):
-    user = db.query(User).filter_by(id=1).first()
+def update_budget_settings(payload: BudgetUpdatePayload, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     if payload.monthly_income is not None:
         user.monthly_income = payload.monthly_income
     if payload.necesidades_pct is not None:
@@ -157,8 +154,8 @@ def update_budget_settings(payload: BudgetUpdatePayload, db: Session = Depends(g
 
 
 @router.post("/alerts/{alert_id}/read")
-def mark_alert_read(alert_id: int, db: Session = Depends(get_db)):
-    alert = db.query(Alert).filter_by(id=alert_id, user_id=1).first()
+def mark_alert_read(alert_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    alert = db.query(Alert).filter_by(id=alert_id, user_id=user.id).first()
     if not alert:
         raise HTTPException(404, "Alerta no encontrada")
     alert.is_read = True
@@ -167,13 +164,9 @@ def mark_alert_read(alert_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/history")
-def get_budget_history(db: Session = Depends(get_db)):
-    user = db.query(User).filter_by(id=1).first()
-    if not user:
-        raise HTTPException(404, "Usuario no encontrado")
-
+def get_budget_history(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     months_raw = db.query(Transaction.month).filter(
-        Transaction.user_id == 1,
+        Transaction.user_id == user.id,
         Transaction.status.in_(["confirmed", "classified"])
     ).distinct().all()
 
@@ -181,7 +174,7 @@ def get_budget_history(db: Session = Depends(get_db)):
     result = []
     for month in months:
         txs = db.query(Transaction).filter(
-            Transaction.user_id == 1,
+            Transaction.user_id == user.id,
             Transaction.month == month,
             Transaction.status.in_(["confirmed", "classified"])
         ).all()

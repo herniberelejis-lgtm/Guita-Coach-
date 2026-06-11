@@ -34,7 +34,7 @@ def test_frequent_merchants_present(mem_db):
     with patch("app.routers.insights.date") as mock_date:
         mock_date.today.return_value = datetime.date(2026, 5, 14)
         mock_date.side_effect = lambda *a, **kw: datetime.date(*a, **kw)
-        result = month_insights(db=mem_db)
+        result = month_insights(db=mem_db, user=mem_db.query(User).first())
     assert "frequent_merchants" in result
     merchants = result["frequent_merchants"]
     assert any(m["merchant"] == "Starbucks" for m in merchants)
@@ -48,7 +48,7 @@ def test_total_spent_excludes_income(mem_db):
     with patch("app.routers.insights.date") as mock_date:
         mock_date.today.return_value = datetime.date(2026, 5, 14)
         mock_date.side_effect = lambda *a, **kw: datetime.date(*a, **kw)
-        result = month_insights(db=mem_db)
+        result = month_insights(db=mem_db, user=mem_db.query(User).first())
     # 5 * 1000 + 8000 = 13000, NOT 113000 (which would include income)
     assert result["total_spent"] == 13000.0
 
@@ -59,6 +59,6 @@ def test_daily_allowance_present(mem_db):
     with patch("app.routers.insights.date") as mock_date:
         mock_date.today.return_value = datetime.date(2026, 5, 14)
         mock_date.side_effect = lambda *a, **kw: datetime.date(*a, **kw)
-        result = month_insights(db=mem_db)
+        result = month_insights(db=mem_db, user=mem_db.query(User).first())
     assert "daily_allowance" in result
     assert result["daily_allowance"] >= 0

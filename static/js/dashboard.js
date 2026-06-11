@@ -138,6 +138,25 @@ function _buildDashboard(budget, insights) {
   budget.franjas.forEach(f => grid.appendChild(_buildFranjaCard(f)));
   frag.appendChild(grid);
 
+  // Charts: donut por franja + histórico
+  const chartsRow = _el('div', { className: 'charts-row' },
+    _el('div', { className: 'card chart-card' },
+      _el('p', { className: 'section-title' }, 'Distribución del gasto'),
+      _buildDonut(budget.franjas)
+    ),
+    _el('div', { className: 'card chart-card' },
+      _el('p', { className: 'section-title' }, 'Últimos meses'),
+      _el('div', { id: 'history-chart' },
+        (() => { const s = document.createElement('div'); s.className = 'spinner'; s.style.cssText = 'display:block;margin:30px auto;'; return s; })()
+      )
+    )
+  );
+  frag.appendChild(chartsRow);
+  API.getBudgetHistory().then(hist => {
+    const wrap = document.getElementById('history-chart');
+    if (wrap) { wrap.textContent = ''; wrap.appendChild(_buildHistoryBars(hist)); }
+  }).catch(() => {});
+
   // Alerts
   if (budget.alerts?.length) {
     const alertsSection = _el('div', { style: 'margin-bottom:24px;' },
@@ -222,6 +241,80 @@ function _buildAlertsList(alerts) {
   return wrap;
 }
 
+const FRANJA_COLORS = { necesidades: '#5B8DEF', gustos: '#C8A84B', ahorro: '#4CAF8C' };
+
+/* Donut SVG: gasto por franja sobre el total gastado. */
+function _buildDonut(franjas) {
+  const total = franjas.reduce((s, f) => s + f.spent, 0);
+  const wrap = _el('div', { className: 'donut-wrap' });
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('viewBox', '0 0 120 120');
+  svg.setAttribute('class', 'donut');
+
+  const R = 48, C = 2 * Math.PI * R;
+  let offset = 0;
+  franjas.forEach(f => {
+    const frac = total > 0 ? f.spent / total : 0;
+    const circle = document.createElementNS(svgNS, 'circle');
+    circle.setAttribute('cx', '60'); circle.setAttribute('cy', '60'); circle.setAttribute('r', String(R));
+    circle.setAttribute('fill', 'none');
+    circle.setAttribute('stroke', FRANJA_COLORS[f.name] || '#888');
+    circle.setAttribute('stroke-width', '16');
+    circle.setAttribute('stroke-dasharray', (frac * C) + ' ' + C);
+    circle.setAttribute('stroke-dashoffset', String(-offset * C));
+    circle.setAttribute('transform', 'rotate(-90 60 60)');
+    svg.appendChild(circle);
+    offset += frac;
+  });
+  const txt = document.createElementNS(svgNS, 'text');
+  txt.setAttribute('x', '60'); txt.setAttribute('y', '64');
+  txt.setAttribute('text-anchor', 'middle');
+  txt.setAttribute('class', 'donut-center');
+  txt.textContent = total > 0 ? App.fmt(total) : 'Sin gastos';
+  svg.appendChild(txt);
+  wrap.appendChild(svg);
+
+  const legend = _el('div', { className: 'donut-legend' });
+  franjas.forEach(f => {
+    const pct = total > 0 ? Math.round(f.spent / total * 100) : 0;
+    legend.appendChild(_el('div', { className: 'legend-item' },
+      _el('span', { className: 'legend-dot', style: 'background:' + (FRANJA_COLORS[f.name] || '#888') }),
+      _el('span', {}, f.label + ' · ' + pct + '% (' + App.fmt(f.spent) + ')')
+    ));
+  });
+  wrap.appendChild(legend);
+  return wrap;
+}
+
+/* Barras horizontales apiladas por mes (histórico). */
+function _buildHistoryBars(hist) {
+  if (!hist || !hist.length) {
+    return _el('div', { className: 'empty' }, 'Todavía no hay histórico');
+  }
+  const months = hist.slice(0, 6).reverse();
+  const max = Math.max(...months.map(m => m.franjas.reduce((s, f) => s + f.spent, 0)), 1);
+  const wrap = _el('div', { className: 'history-bars' });
+  months.forEach(m => {
+    const totalSpent = m.franjas.reduce((s, f) => s + f.spent, 0);
+    const bar = _el('div', { className: 'hbar-track' });
+    m.franjas.forEach(f => {
+      if (f.spent <= 0) return;
+      bar.appendChild(_el('div', {
+        className: 'hbar-seg',
+        style: 'width:' + (f.spent / max * 100) + '%;background:' + (FRANJA_COLORS[f.name] || '#888'),
+        title: f.label + ': ' + App.fmt(f.spent),
+      }));
+    });
+    wrap.appendChild(_el('div', { className: 'hbar-row' },
+      _el('span', { className: 'hbar-label' }, m.month),
+      bar,
+      _el('span', { className: 'hbar-total' }, App.fmt(totalSpent))
+    ));
+  });
+  return wrap;
+}
+
 function _statPill(val, lbl) {
   return _el('div', { className: 'stat-pill' },
     _el('div', {},
@@ -244,8 +337,10 @@ function _buildTxTable(items) {
   table.appendChild(thead);
   const tbody = document.createElement('tbody');
   items.forEach(t => {
-    const cls = t.needs_review ? 'review' : t.category;
-    const label = t.needs_review ? '? revisar' : t.category;
+    let cls = t.needs_review ? 'review' : t.category;
+    let label = t.needs_review ? '? revisar' : t.category;
+    if (t.is_internal_transfer) { cls = 'transfer'; label = 'transferencia propia'; }
+    else if (t.is_duplicate)    { cls = 'duplicate'; label = 'duplicado'; }
     tbody.appendChild(_el('tr', {},
       _el('td', {}, t.merchant),
       _el('td', {}, _el('span', { className: 'badge ' + cls }, label)),

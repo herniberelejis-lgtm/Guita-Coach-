@@ -1,4 +1,21 @@
-# Guita Coach — Estado del proyecto (2026-05-13)
+# Guita Coach — Estado del proyecto (2026-06-11)
+
+## Novedades de esta iteración (2026-06-11)
+
+- **Login real multi-usuario**: registro/login con email+contraseña (PBKDF2),
+  sesiones con cookie HttpOnly (`app/security.py`, tabla `user_sessions`).
+  Todos los endpoints migrados de `user_id=1` al usuario autenticado.
+  En `DEMO_MODE=true` sigue entrando directo como usuario 1.
+- **Filtros de datos** (`app/services/dedup.py`): duplicados entre fuentes
+  (manual/Gmail/MP) y transferencias entre cuentas propias se marcan y se
+  excluyen de presupuesto, insights, advisor y chat.
+- **UI**: pantalla de login/registro, campana de notificaciones con panel,
+  donut de distribución de gasto + barras de histórico en el dashboard,
+  badges de "transferencia propia" y "duplicado".
+- **Tests**: 34/34 pasan (se arreglaron los 2 de MP que pegaban a la API real).
+- **Docs nuevas**: `docs/integraciones-bancarias.md` (plan de conexiones
+  bancarias en AR) y `docs/deploy.md` (checklist para publicar).
+
 
 ## Para arrancar HOY
 
