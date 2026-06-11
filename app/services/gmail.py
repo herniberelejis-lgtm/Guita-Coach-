@@ -87,6 +87,36 @@ async def fetch_payment_emails(access_token: str, max_results: int = 400) -> lis
 
     return results
 
+_PROMO_PATTERNS = re.compile(
+    r"hasta \$|gan[aá]|sorteo|descuento|off\b|promo|oferta|cuotas sin inter[eé]s|"
+    r"suscribite|newsletter|no te pierdas|aprovech[aá]|beneficio|reintegro de hasta",
+    re.IGNORECASE,
+)
+
+# Frases transaccionales: el monto se toma SOLO de estas, nunca del email entero
+_TX_AMOUNT = re.compile(
+    r"(?:pagaste|compra(?:ste)? (?:aprobada |de )?|se debit[oó]|d[eé]bito de|pago (?:de|por|realizado por)|"
+    r"abonaste|total(?: a pagar)?:?|consumo de|factura por|transferiste|enviaste)"
+    r"[^\d$]{0,20}\$\s?([\d.,]+)",
+    re.IGNORECASE,
+)
+
+_INCOME_AMOUNT = re.compile(
+    r"(?:recibiste|te acreditaron|te transfirieron|acreditaci[oó]n de|dep[oó]sito de)"
+    r"[^\d$]{0,20}\$\s?([\d.,]+)",
+    re.IGNORECASE,
+)
+
+# Tope de plausibilidad: las promos hablan de millones, los gastos reales no
+MAX_PLAUSIBLE = 20_000_000
+
+
+def _is_promotional(headers: dict, text: str) -> bool:
+    if "list-unsubscribe" in headers:
+        return True
+    return bool(_PROMO_PATTERNS.search(text))
+
+
 def _parse_email(msg: dict, gmail_id: str = "") -> Optional[dict]:
     headers = {h["name"].lower(): h["value"] for h in msg.get("payload", {}).get("headers", [])}
     subject = headers.get("subject", "")
@@ -97,13 +127,15 @@ def _parse_email(msg: dict, gmail_id: str = "") -> Optional[dict]:
     full_text = _extract_body(msg)
     text = f"{subject}\n{snippet}\n{full_text}"
 
-    # Check income first
     unique_id = f"gmail_{gmail_id}" if gmail_id else subject
 
+    if _is_promotional(headers, text):
+        return None
+
     if _is_income_email(text):
-        amounts = re.findall(r'\$([\d\.]+(?:,\d{1,2})?)', text)
-        amount = max((_parse_amount(a) for a in amounts), default=0.0)
-        if amount >= 100:
+        matches = _INCOME_AMOUNT.findall(text)
+        amount = max((_parse_amount(a) for a in matches), default=0.0)
+        if 100 <= amount <= MAX_PLAUSIBLE:
             return {
                 "merchant": _extract_sender_name({"from": sender}) or "Ingreso Gmail",
                 "amount": amount,
@@ -156,13 +188,12 @@ def _try_parse_mercadopago(text: str, subject: str, date_str: str, sender: str) 
     return None
 
 def _try_parse_generic(text: str, subject: str, date_str: str, sender: str) -> Optional[dict]:
-    amount_pattern = re.compile(r"\$\s?([\d.,]+)")
-    amounts = amount_pattern.findall(text)
-    if not amounts:
+    matches = _TX_AMOUNT.findall(text)
+    if not matches:
         return None
 
-    amount = max(_parse_amount(a) for a in amounts)
-    if amount < 100:
+    amount = max(_parse_amount(a) for a in matches)
+    if amount < 100 or amount > MAX_PLAUSIBLE:
         return None
 
     merchant = _extract_merchant(sender, subject)
@@ -175,6 +206,7 @@ def _try_parse_generic(text: str, subject: str, date_str: str, sender: str) -> O
         "source": "gmail",
         "raw_reference": subject,
         "confidence": 0.6,
+        "needs_review": True,
     }
 
 def _parse_amount(s: str) -> float:
