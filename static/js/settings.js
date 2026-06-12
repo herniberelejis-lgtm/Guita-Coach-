@@ -52,6 +52,9 @@ const Settings = {
       main.appendChild(this._buildConnCard(cfg, connected, status?.last_sync));
     });
 
+    // ── Import CSV de MP ─────────────────────────────────────────────────────
+    main.appendChild(this._buildCsvImportCard());
+
     // ── Budget settings ──────────────────────────────────────────────────────
     const hr1 = document.createElement('hr');
     hr1.className = 'divider';
@@ -63,6 +66,64 @@ const Settings = {
     main.appendChild(budgetTitle);
 
     main.appendChild(this._buildBudgetForm(budget));
+  },
+
+  /* Importar estado de cuenta de MP: cubre compras con tarjeta que la API no expone. */
+  _buildCsvImportCard() {
+    const card = document.createElement('div');
+    card.className = 'conn-card';
+
+    const icon = document.createElement('div');
+    icon.className = 'conn-icon mp';
+    icon.textContent = '📄';
+    card.appendChild(icon);
+
+    const info = document.createElement('div');
+    info.className = 'conn-info';
+    const name = document.createElement('div');
+    name.className = 'conn-name';
+    name.textContent = 'Estado de cuenta de MP (CSV)';
+    const desc = document.createElement('div');
+    desc.className = 'conn-desc';
+    desc.textContent = 'Las compras con tarjeta MP no salen por la API. Descargá tu estado de cuenta desde la app de MP (Más → Estado de cuenta → Descargar) y subilo acá. Se deduplica solo.';
+    info.appendChild(name);
+    info.appendChild(desc);
+    card.appendChild(info);
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv,.txt';
+    input.style.display = 'none';
+
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-primary btn-sm';
+    btn.textContent = 'Subir CSV';
+    btn.addEventListener('click', () => input.click());
+
+    input.addEventListener('change', async () => {
+      const file = input.files[0];
+      if (!file) return;
+      btn.disabled = true;
+      btn.textContent = 'Importando…';
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch('/api/sync/csv', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Error al importar');
+        App.toast(`Importado: ${data.saved} movimientos nuevos de ${data.fetched} leídos`, 'success');
+      } catch (err) {
+        App.toast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Subir CSV';
+        input.value = '';
+      }
+    });
+
+    card.appendChild(input);
+    card.appendChild(btn);
+    return card;
   },
 
   _buildConnCard(cfg, connected, lastSync) {
