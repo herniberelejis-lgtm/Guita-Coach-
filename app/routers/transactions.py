@@ -156,6 +156,33 @@ async def correct_category(
     return _tx_dict(tx)
 
 
+class SplitConfirmPayload(BaseModel):
+    income_ids: list[int]
+    alert_id: int | None = None
+
+
+@router.post("/{tx_id}/split-confirm")
+def confirm_split_endpoint(
+    tx_id: int,
+    payload: SplitConfirmPayload,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Confirma que las entradas son devoluciones de un gasto compartido."""
+    from ..services.splits import confirm_split
+    from ..models import Alert
+    try:
+        result = confirm_split(db, user.id, tx_id, payload.income_ids)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    if payload.alert_id:
+        alert = db.query(Alert).filter_by(id=payload.alert_id, user_id=user.id).first()
+        if alert:
+            alert.is_read = True
+            db.commit()
+    return result
+
+
 @router.delete("/{tx_id}")
 def delete_transaction(tx_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     tx = db.query(Transaction).filter_by(id=tx_id, user_id=user.id).first()

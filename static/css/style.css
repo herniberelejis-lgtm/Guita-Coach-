@@ -711,3 +711,10 @@ html[data-theme="zen"] {
 .cat-total strong { color: var(--white); }
 
 .metric-sub { display: block; color: var(--muted); font-size: .68rem; margin-top: 3px; }
+
+/* ─── Acciones de gasto compartido ──────────────────────────────────────── */
+.split-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.btn-ghost {
+  background: transparent; border: 1px solid var(--navy3); color: var(--muted);
+}
+.btn-ghost:hover { color: var(--white); border-color: var(--muted); }

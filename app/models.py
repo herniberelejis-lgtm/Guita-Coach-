@@ -52,6 +52,8 @@ class Transaction(Base):
     tx_type = Column(String, default="expense")   # "expense" | "income"
     is_internal_transfer = Column(Boolean, default=False)  # transferencia entre cuentas propias
     is_duplicate = Column(Boolean, default=False)          # duplicado de otra fuente
+    is_reimbursement = Column(Boolean, default=False)      # devolución de gasto compartido
+    reimburses_tx_id = Column(Integer, nullable=True)      # gasto al que devuelve
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -102,6 +104,7 @@ class Alert(Base):
     category = Column(String)        # necesidades | gustos | ahorro
     message = Column(Text)
     ai_advice = Column(Text)
+    payload = Column(Text)           # JSON con datos de acción (ej: split sugerido)
     severity = Column(String)        # warning | critical
     is_read = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)

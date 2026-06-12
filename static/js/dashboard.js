@@ -237,11 +237,42 @@ function _buildAlertsList(alerts) {
   const wrap = _el('div', { id: 'alerts-list' });
   const icons = { critical: '\u{1F534}', warning: '\u{1F7E1}', info: '\u{1F7E2}' };
   alerts.forEach(a => {
+    let splitActions = null;
+    if (a.type === 'split_suggestion' && a.payload) {
+      let p = null;
+      try { p = JSON.parse(a.payload); } catch (_) { /* payload corrupto: sin botones */ }
+      if (p && p.expense_id && p.income_ids) {
+        splitActions = _el('div', { className: 'split-actions' },
+          _el('button', {
+            className: 'btn btn-primary btn-sm',
+            onclick: async function() {
+              this.disabled = true;
+              try {
+                const r = await API.confirmSplit(p.expense_id, { income_ids: p.income_ids, alert_id: a.id });
+                App.toast('Listo: gasto neto ' + App.fmt(r.net_expense) + ' (te devolvieron ' + App.fmt(r.reimbursed_total) + ')', 'success');
+                Dashboard.render();
+              } catch (err) {
+                App.toast(err.message, 'error');
+                this.disabled = false;
+              }
+            }
+          }, 'Sí, era compartido'),
+          _el('button', {
+            className: 'btn btn-sm btn-ghost',
+            onclick: async function() {
+              await API.markAlertRead(a.id).catch(() => {});
+              this.closest('.alert-item').remove();
+            }
+          }, 'No, dejar como está')
+        );
+      }
+    }
     const item = _el('div', { className: 'alert-item ' + a.severity },
-      _el('span', { className: 'alert-icon' }, icons[a.severity] || '⚠️'),
+      _el('span', { className: 'alert-icon' }, a.type === 'split_suggestion' ? '🤝' : (icons[a.severity] || '⚠️')),
       _el('div', { style: 'flex:1' },
         _el('div', { className: 'alert-msg' }, a.message),
-        ...(a.ai_advice ? [_el('div', { className: 'alert-advice' }, a.ai_advice)] : [])
+        ...(a.ai_advice ? [_el('div', { className: 'alert-advice' }, a.ai_advice)] : []),
+        ...(splitActions ? [splitActions] : [])
       ),
       _el('button', {
         className: 'alert-dismiss',

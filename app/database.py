@@ -15,6 +15,9 @@ def _run_migrations():
         "ALTER TABLE transactions ADD COLUMN is_duplicate BOOLEAN DEFAULT 0",
         "ALTER TABLE users ADD COLUMN email VARCHAR",
         "ALTER TABLE users ADD COLUMN password_hash VARCHAR",
+        "ALTER TABLE transactions ADD COLUMN is_reimbursement BOOLEAN DEFAULT 0",
+        "ALTER TABLE transactions ADD COLUMN reimburses_tx_id INTEGER",
+        "ALTER TABLE alerts ADD COLUMN payload TEXT",
     ]
     with engine.connect() as conn:
         for sql in migrations:

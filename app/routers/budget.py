@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import User, Transaction, Alert
 from ..security import get_current_user
+from ..services.splits import expense_amount, reimbursement_map
 
 router = APIRouter(prefix="/api/budget", tags=["budget"])
 
@@ -28,16 +29,17 @@ class BudgetUpdatePayload(BaseModel):
     payday: Optional[int] = None
 
 
-def _franja_data(user: User, txs: list, month: str, days_remaining: int = 1) -> dict:
+def _franja_data(user: User, txs: list, month: str, days_remaining: int = 1, reimb: dict | None = None) -> dict:
     income = user.monthly_income or 0
     limits = {
         "necesidades": income * user.necesidades_pct / 100,
         "gustos": income * user.gustos_pct / 100,
         "ahorro": income * user.ahorro_pct / 100,
     }
+    reimb = reimb or {}
     visible = [t for t in txs if not getattr(t, 'is_internal_transfer', False) and not getattr(t, 'is_duplicate', False)]
     spent = {
-        cat: sum(t.amount for t in visible if t.category == cat and getattr(t, 'tx_type', 'expense') == 'expense')
+        cat: sum(expense_amount(t, reimb) for t in visible if t.category == cat and getattr(t, 'tx_type', 'expense') == 'expense')
         for cat in limits
     }
     dr = max(days_remaining, 1)
@@ -77,14 +79,18 @@ def get_current_budget(db: Session = Depends(get_db), user: User = Depends(get_c
     days_passed = now.day
 
     days_remaining = max(days_in_month - days_passed, 1)
-    data = _franja_data(user, txs, month, days_remaining=days_remaining)
+    reimb = reimbursement_map(db, user.id)
+    data = _franja_data(user, txs, month, days_remaining=days_remaining, reimb=reimb)
     data["days_passed"] = days_passed
     data["days_in_month"] = days_in_month
     data["days_remaining"] = days_in_month - days_passed
 
     visible_txs = [t for t in txs if not getattr(t, 'is_internal_transfer', False) and not getattr(t, 'is_duplicate', False)]
-    tracked_income = sum(t.amount for t in visible_txs if getattr(t, 'tx_type', 'expense') == 'income')
-    total_expenses = sum(t.amount for t in visible_txs if getattr(t, 'tx_type', 'expense') == 'expense')
+    tracked_income = sum(t.amount for t in visible_txs
+                         if getattr(t, 'tx_type', 'expense') == 'income'
+                         and not getattr(t, 'is_reimbursement', False))
+    total_expenses = sum(expense_amount(t, reimb) for t in visible_txs
+                         if getattr(t, 'tx_type', 'expense') == 'expense')
 
     # El sueldo declarado es el piso de ingresos del mes: si lo registrado
     # (MP/Gmail/manual) no lo alcanza, se asume que el resto entra por canales
@@ -118,6 +124,7 @@ def get_current_budget(db: Session = Depends(get_db), user: User = Depends(get_c
             "message": a.message,
             "ai_advice": a.ai_advice,
             "severity": a.severity,
+            "payload": a.payload,
             "created_at": a.created_at.isoformat(),
         }
         for a in alerts
@@ -189,6 +196,6 @@ def get_budget_history(db: Session = Depends(get_db), user: User = Depends(get_c
             Transaction.month == month,
             Transaction.status.in_(["confirmed", "classified"])
         ).all()
-        result.append(_franja_data(user, txs, month))
+        result.append(_franja_data(user, txs, month, reimb=reimbursement_map(db, user.id)))
 
     return result

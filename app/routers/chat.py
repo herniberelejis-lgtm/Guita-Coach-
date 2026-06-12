@@ -42,6 +42,11 @@ def _load_financial_context(db: Session, user: User) -> dict:
     ).all()
     txs = [t for t in all_txs if t.month == month]
 
+    from ..services.splits import reimbursement_map
+    reimb = reimbursement_map(db, user.id)
+    all_txs = [t for t in all_txs if not (t.tx_type == "income" and getattr(t, "is_reimbursement", False))]
+    txs = [t for t in all_txs if t.month == month]
+
     income = sum(t.amount for t in txs if t.tx_type == "income")
     expenses = sum(t.amount for t in txs if t.tx_type == "expense")
     savings_accumulated = sum(t.amount for t in txs if t.category == "ahorro")

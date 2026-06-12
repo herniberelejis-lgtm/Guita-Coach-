@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import User, Transaction
 from ..security import get_current_user
+from ..services.splits import expense_amount, reimbursement_map
 
 router = APIRouter(prefix="/api/insights", tags=["insights"])
 
@@ -56,6 +57,7 @@ def categories_breakdown(month: str = None, db: Session = Depends(get_db),
         Transaction.is_duplicate == False,
         Transaction.status.in_(["confirmed", "classified"]),
     ).all()
+    reimb = reimbursement_map(db, user.id)
     by_cat: dict = {}
     for t in txs:
         key = (t.subcategory or "").strip() or {
@@ -63,7 +65,7 @@ def categories_breakdown(month: str = None, db: Session = Depends(get_db),
             "ahorro": "Ahorro",
         }.get(t.category or "", "Pendiente de categoría")
         e = by_cat.setdefault(key, {"amount": 0.0, "count": 0, "franja": t.category})
-        e["amount"] += t.amount
+        e["amount"] += expense_amount(t, reimb)
         e["count"] += 1
     total = sum(e["amount"] for e in by_cat.values())
     items = sorted(

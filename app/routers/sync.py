@@ -6,6 +6,7 @@ from ..database import get_db
 from ..models import Connection, Transaction, User
 from ..security import get_current_user
 from ..services.dedup import find_cross_source_duplicate, mark_duplicates_and_transfers
+from ..services.splits import detect_split_candidates
 from ..services.classifier import classify
 from ..services.alert_engine import run_alert_engine
 
@@ -109,10 +110,11 @@ async def sync_gmail(background_tasks: BackgroundTasks, db: Session = Depends(ge
     conn.last_sync = datetime.utcnow()
     db.commit()
     flagged = mark_duplicates_and_transfers(db, user.id)
+    splits = detect_split_candidates(db, user.id)
 
     background_tasks.add_task(run_alert_engine, user.id, db)
 
-    return {"ok": True, "fetched": len(items), "saved": saved, "flagged": flagged}
+    return {"ok": True, "fetched": len(items), "saved": saved, "flagged": flagged, "split_suggestions": splits}
 
 
 @router.post("/mp")
@@ -132,10 +134,11 @@ async def sync_mp(background_tasks: BackgroundTasks, db: Session = Depends(get_d
     conn.last_sync = datetime.utcnow()
     db.commit()
     flagged = mark_duplicates_and_transfers(db, user.id)
+    splits = detect_split_candidates(db, user.id)
 
     background_tasks.add_task(run_alert_engine, user.id, db)
 
-    return {"ok": True, "fetched": len(items), "saved": saved, "flagged": flagged}
+    return {"ok": True, "fetched": len(items), "saved": saved, "flagged": flagged, "split_suggestions": splits}
 
 
 @router.get("/status")

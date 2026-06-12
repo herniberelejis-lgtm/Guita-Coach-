@@ -35,6 +35,7 @@ const API = {
   getNeedsReview:    () => API.get('/transactions/needs-review'),
   addTransaction:    (d) => API.post('/transactions', d),
   correctCategory:   (id, d) => API.patch(`/transactions/${id}/category`, d),
+  confirmSplit:      (id, d) => API.post(`/transactions/${id}/split-confirm`, d),
   deleteTransaction: (id) => API.delete(`/transactions/${id}`),
 
   // Sync
