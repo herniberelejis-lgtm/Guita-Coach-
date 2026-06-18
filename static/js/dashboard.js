@@ -193,6 +193,42 @@ function _buildDashboard(budget, insights) {
     frag.appendChild(statsGrid);
   }
 
+  // Investments card
+  const investCard = _el('div', { className: 'card', style: 'margin-bottom:24px;' },
+    _el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;' },
+      _el('p', { className: 'section-title', style: 'margin:0;' }, 'Inversiones'),
+      _el('a', {
+        href: '#',
+        onclick: function(e) { e.preventDefault(); App.navigate('investments'); }
+      }, 'Ver detalles →')
+    ),
+    _el('div', { id: 'investments-summary' },
+      (() => { const s = document.createElement('div'); s.className = 'spinner'; s.style.cssText = 'display:block;margin:20px auto;'; return s; })()
+    )
+  );
+  frag.appendChild(investCard);
+
+  API.getInvestmentSummary().then(inv => {
+    const wrap = document.getElementById('investments-summary');
+    if (!wrap) return;
+    wrap.textContent = '';
+    if (inv && inv.total_invested > 0) {
+      wrap.appendChild(_buildInvestmentSummary(inv));
+    } else {
+      const empty = _el('div', { className: 'empty', style: 'padding:20px;text-align:center;' });
+      empty.textContent = 'Sin inversiones aún. Sube un CSV de tu broker.';
+      wrap.appendChild(empty);
+    }
+  }).catch(() => {
+    const wrap = document.getElementById('investments-summary');
+    if (wrap) {
+      wrap.textContent = '';
+      const msg = _el('div', { className: 'empty', style: 'padding:20px;text-align:center;font-size:.9rem;color:var(--muted);' });
+      msg.textContent = 'No se pudo cargar inversiones';
+      wrap.appendChild(msg);
+    }
+  });
+
   // Recent transactions card
   const card = _el('div', { className: 'card' });
   const cardHeader = _el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;' },
@@ -429,4 +465,25 @@ function _buildTxTable(items) {
   });
   table.appendChild(tbody);
   return table;
+}
+
+function _buildInvestmentSummary(inv) {
+  const grid = _el('div', { className: 'grid-3', style: 'margin-top:12px;' },
+    _el('div', { className: 'metric-box' },
+      _el('span', { className: 'metric-label' }, 'Invertido'),
+      _el('span', { className: 'metric-value', style: 'color:var(--info)' }, App.fmt(inv.total_invested))
+    ),
+    _el('div', { className: 'metric-box' },
+      _el('span', { className: 'metric-label' }, 'Valor actual'),
+      _el('span', { className: 'metric-value' }, App.fmt(inv.total_current_value))
+    ),
+    _el('div', { className: 'metric-box' },
+      _el('span', { className: 'metric-label' }, 'P&L'),
+      _el('span', {
+        className: 'metric-value',
+        style: 'color:' + (inv.total_pnl >= 0 ? 'var(--success)' : 'var(--error)')
+      }, (inv.total_pnl >= 0 ? '+' : '') + App.fmt(inv.total_pnl))
+    )
+  );
+  return grid;
 }

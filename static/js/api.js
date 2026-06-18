@@ -38,6 +38,18 @@ const API = {
   confirmSplit:      (id, d) => API.post(`/transactions/${id}/split-confirm`, d),
   deleteTransaction: (id) => API.delete(`/transactions/${id}`),
 
+  // Investments
+  getInvestmentSummary: () => API.get('/investments/summary'),
+  getInvestmentHoldings: () => API.get('/investments/holdings'),
+  uploadInvestmentCSV: (file) => {
+    const form = new FormData();
+    form.append('file', file);
+    return fetch('/api/investments/upload', {
+      method: 'POST',
+      body: form
+    }).then(res => res.ok ? res.json() : res.json().then(e => Promise.reject(new Error(e.detail))));
+  },
+
   // Sync
   syncGmail:  () => API.post('/sync/gmail'),
   syncMP:     () => API.post('/sync/mp'),
