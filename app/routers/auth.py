@@ -78,8 +78,6 @@ def me(user: User = Depends(get_current_user)):
 
 
 # ─── Login social (Google / Mercado Pago) ───────────────────────────────────
-_login_states: set[str] = set()
-
 
 @router.get("/providers")
 def login_providers():
@@ -92,16 +90,18 @@ def login_providers():
     }
 
 
-def _login_state() -> str:
+def _login_state(response: Response) -> str:
+    """Generate state and store in cookie (survives redeploys)."""
     state = secrets.token_urlsafe(16)
-    _login_states.add(state)
+    response.set_cookie("oauth_state", state, max_age=600, httponly=True, samesite="lax")
     return state
 
 
-def _check_login_state(state: str) -> None:
-    if state not in _login_states:
+def _check_login_state(request: Request, state: str) -> None:
+    """Validate state from cookie."""
+    cookie_state = request.cookies.get("oauth_state")
+    if not cookie_state or cookie_state != state:
         raise HTTPException(400, "Estado OAuth inválido")
-    _login_states.discard(state)
 
 
 def _find_or_create_user(db: Session, email: str, name: str) -> User:
@@ -120,7 +120,7 @@ def _find_or_create_user(db: Session, email: str, name: str) -> User:
 
 
 @router.get("/google/login")
-def google_login():
+def google_login(response: Response):
     settings = get_settings()
     if not settings.gmail_enabled:
         raise HTTPException(400, "Login con Google no configurado. Agregá GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en .env")
@@ -131,13 +131,13 @@ def google_login():
         f"&redirect_uri={redirect}"
         "&response_type=code"
         "&scope=openid%20email%20profile"
-        f"&state={_login_state()}"
+        f"&state={_login_state(response)}"
     )
 
 
 @router.get("/google/login/callback")
-async def google_login_callback(code: str, state: str, db: Session = Depends(get_db)):
-    _check_login_state(state)
+async def google_login_callback(request: Request, code: str, state: str, db: Session = Depends(get_db)):
+    _check_login_state(request, state)
     import httpx
     settings = get_settings()
     async with httpx.AsyncClient(timeout=20) as client:
@@ -169,7 +169,7 @@ async def google_login_callback(code: str, state: str, db: Session = Depends(get
 
 
 @router.get("/mp/login")
-def mp_login():
+def mp_login(response: Response):
     settings = get_settings()
     if not settings.mp_enabled:
         raise HTTPException(400, "Login con Mercado Pago no configurado. Agregá MP_CLIENT_ID y MP_CLIENT_SECRET en .env")
@@ -179,13 +179,13 @@ def mp_login():
         f"?client_id={settings.mp_client_id}"
         f"&redirect_uri={redirect}"
         "&response_type=code"
-        f"&state={_login_state()}"
+        f"&state={_login_state(response)}"
     )
 
 
 @router.get("/mp/login/callback")
-async def mp_login_callback(code: str, state: str, db: Session = Depends(get_db)):
-    _check_login_state(state)
+async def mp_login_callback(request: Request, code: str, state: str, db: Session = Depends(get_db)):
+    _check_login_state(request, state)
     import httpx
     settings = get_settings()
     async with httpx.AsyncClient(timeout=20) as client:
