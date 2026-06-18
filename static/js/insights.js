@@ -65,7 +65,7 @@ const Insights = {
     franjasTitle.textContent = 'Franjas del mes';
     main.appendChild(franjasTitle);
 
-    (insights.franjas || []).forEach(function(f) {
+    (Array.isArray(insights.franjas) ? insights.franjas : []).forEach(function(f) {
       const pct = f.limit > 0 ? Math.round(f.spent / f.limit * 100) : 0;
       const cls = pct >= 90 ? 'danger' : pct >= 75 ? 'warn' : 'ok';
 
