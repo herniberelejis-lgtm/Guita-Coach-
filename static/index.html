@@ -19,61 +19,87 @@
 <body>
 
 <!-- Auth overlay (login / registro) -->
-<div id="auth-overlay" style="display:none;">
-  <div class="auth-box">
-    <div class="auth-brand">
-      <h1>Guita Coach</h1>
-      <p>Tus finanzas, claras y bajo control.</p>
+<div id="auth-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100vh;background:var(--color-bg);z-index:9999;display:flex;">
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:60px;background:linear-gradient(135deg, var(--color-bg-secondary) 0%, var(--color-bg) 100%);">
+    <!-- Info side -->
+    <div style="max-width:500px;">
+      <h1 style="font-size:3.2rem;margin-bottom:20px;color:var(--color-accent);">Guita Coach</h1>
+      <p style="font-size:1.2rem;color:var(--color-text-secondary);line-height:1.8;margin-bottom:40px;">Tu asistente de finanzas personales. Sincroniza tus cuentas, categoriza gastos automáticamente, y toma decisiones financieras informadas.</p>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:40px;">
+        <div style="background:var(--color-bg);padding:20px;border-radius:8px;border-left:4px solid var(--color-accent);">
+          <p style="font-weight:600;margin-bottom:8px;">📊 Análisis en vivo</p>
+          <p style="font-size:0.9rem;color:var(--color-text-secondary);">Ve tu flujo de dinero actualizado cada hora</p>
+        </div>
+        <div style="background:var(--color-bg);padding:20px;border-radius:8px;border-left:4px solid var(--color-accent);">
+          <p style="font-weight:600;margin-bottom:8px;">🔒 Datos privados</p>
+          <p style="font-size:0.9rem;color:var(--color-text-secondary);">Nunca accedemos a tus contraseñas</p>
+        </div>
+        <div style="background:var(--color-bg);padding:20px;border-radius:8px;border-left:4px solid var(--color-accent);">
+          <p style="font-weight:600;margin-bottom:8px;">💰 Presupuestos</p>
+          <p style="font-size:0.9rem;color:var(--color-text-secondary);">Controla Necesidades, Gustos y Ahorro</p>
+        </div>
+        <div style="background:var(--color-bg);padding:20px;border-radius:8px;border-left:4px solid var(--color-accent);">
+          <p style="font-weight:600;margin-bottom:8px;">📈 Inversiones</p>
+          <p style="font-size:0.9rem;color:var(--color-text-secondary);">Sube tus movimientos de brokers</p>
+        </div>
+      </div>
     </div>
+  </div>
 
-    <div class="auth-tabs">
-      <button type="button" data-auth-tab="login" class="active">Ingresar</button>
-      <button type="button" data-auth-tab="register">Crear cuenta</button>
-    </div>
+  <!-- Form side -->
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:60px;background:var(--color-bg);">
+    <div class="auth-box" style="width:100%;max-width:400px;box-shadow:none;border:none;padding:0;">
+      <div class="auth-brand">
+        <h2 style="font-size:1.8rem;">¡Hola!</h2>
+        <p>Ingresá o crea tu cuenta</p>
+      </div>
 
-    <form id="login-form">
-      <div class="form-group">
-        <label>Email</label>
-        <input type="email" name="email" placeholder="vos@email.com" required autocomplete="email">
+      <div class="auth-tabs">
+        <button type="button" data-auth-tab="login" class="active">Ingresar</button>
+        <button type="button" data-auth-tab="register">Crear cuenta</button>
       </div>
-      <div class="form-group">
-        <label>Contraseña</label>
-        <input type="password" name="password" required autocomplete="current-password">
-      </div>
-      <button type="submit" class="btn btn-primary auth-submit">Entrar</button>
-    </form>
 
-    <form id="register-form" style="display:none;">
-      <div class="form-group">
-        <label>Tu nombre</label>
-        <input type="text" name="name" placeholder="Hernán" required>
-      </div>
-      <div class="form-group">
-        <label>Email</label>
-        <input type="email" name="email" placeholder="vos@email.com" required autocomplete="email">
-      </div>
-      <div class="form-group">
-        <label>Contraseña (mínimo 8 caracteres)</label>
-        <input type="password" name="password" minlength="8" required autocomplete="new-password">
-      </div>
-      <button type="submit" class="btn btn-primary auth-submit">Crear mi cuenta</button>
-    </form>
+      <form id="login-form">
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" name="email" placeholder="vos@email.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label>Contraseña</label>
+          <input type="password" name="password" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary auth-submit">Entrar</button>
+      </form>
 
-    <div class="auth-divider"><span>o continuá con</span></div>
+      <form id="register-form" style="display:none;">
+        <div class="form-group">
+          <label>Tu nombre</label>
+          <input type="text" name="name" placeholder="Hernán" required>
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" name="email" placeholder="vos@email.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label>Contraseña (mínimo 8 caracteres)</label>
+          <input type="password" name="password" minlength="8" required autocomplete="new-password">
+        </div>
+        <button type="submit" class="btn btn-primary auth-submit">Crear mi cuenta</button>
+      </form>
 
-    <div class="social-login">
-      <button type="button" id="social-google" class="social-btn" onclick="location.href='/api/auth/google/login'">
-        <svg viewBox="0 0 24 24" width="18" height="18"><path fill="#EA4335" d="M12 5.4c1.7 0 3.2.6 4.4 1.7l3.3-3.3C17.7 1.9 15 .8 12 .8 7.4.8 3.4 3.4 1.5 7.2l3.8 3C6.3 7.4 8.9 5.4 12 5.4z"/><path fill="#4285F4" d="M23.5 12.3c0-.9-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.7-2.4 3.6l3.7 2.9c2.2-2 3.7-5 3.7-8.7z"/><path fill="#FBBC05" d="M5.3 14.3a7 7 0 0 1 0-4.2l-3.8-3a11.2 11.2 0 0 0 0 10.2l3.8-3z"/><path fill="#34A853" d="M12 23.2c3 0 5.6-1 7.5-2.7l-3.7-2.9c-1 .7-2.3 1.1-3.8 1.1-3.1 0-5.7-2-6.7-4.8l-3.8 3c1.9 3.8 5.9 6.3 10.5 6.3z"/></svg>
-        Google
-      </button>
-      <button type="button" id="social-mp" class="social-btn" onclick="location.href='/api/auth/mp/login'">
-        <svg viewBox="0 0 24 24" width="18" height="18"><ellipse cx="12" cy="12" rx="11" ry="7.5" fill="#00B1EA"/><path d="M7 10c1.5-1.5 3-1 4 0l1 1c.8.8 2 .8 3 0l2-1.5" stroke="#fff" stroke-width="1.3" fill="none"/></svg>
-        Mercado Pago
-      </button>
-      <button type="button" id="social-bank" class="social-btn" disabled title="En Argentina todavía no hay login bancario público. Llega con la integración de agregadores.">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3"/></svg>
-        Banco · próximamente
-      </button>
+      <div class="auth-divider"><span>o continuá con</span></div>
+
+      <div class="social-login">
+        <button type="button" id="social-google" class="social-btn" onclick="location.href='/api/auth/google/login'">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="#EA4335" d="M12 5.4c1.7 0 3.2.6 4.4 1.7l3.3-3.3C17.7 1.9 15 .8 12 .8 7.4.8 3.4 3.4 1.5 7.2l3.8 3C6.3 7.4 8.9 5.4 12 5.4z"/><path fill="#4285F4" d="M23.5 12.3c0-.9-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.7-2.4 3.6l3.7 2.9c2.2-2 3.7-5 3.7-8.7z"/><path fill="#FBBC05" d="M5.3 14.3a7 7 0 0 1 0-4.2l-3.8-3a11.2 11.2 0 0 0 0 10.2l3.8-3z"/><path fill="#34A853" d="M12 23.2c3 0 5.6-1 7.5-2.7l-3.7-2.9c-1 .7-2.3 1.1-3.8 1.1-3.1 0-5.7-2-6.7-4.8l-3.8 3c1.9 3.8 5.9 6.3 10.5 6.3z"/></svg>
+          Google
+        </button>
+        <button type="button" id="social-mp" class="social-btn" onclick="location.href='/api/auth/mp/login'">
+          <svg viewBox="0 0 24 24" width="18" height="18"><ellipse cx="12" cy="12" rx="11" ry="7.5" fill="#00B1EA"/><path d="M7 10c1.5-1.5 3-1 4 0l1 1c.8.8 2 .8 3 0l2-1.5" stroke="#fff" stroke-width="1.3" fill="none"/></svg>
+          Mercado Pago
+        </button>
+      </div>
     </div>
   </div>
 </div>
