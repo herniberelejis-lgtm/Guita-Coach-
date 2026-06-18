@@ -172,7 +172,7 @@ const Investments = {
           accept: '.csv,.xlsx',
           id: 'file-input',
           style: 'display:none',
-          onChange: (e) => this._handleFileSelect(e),
+          onchange: (e) => this._handleFileSelect(e),
         }),
       ),
 
