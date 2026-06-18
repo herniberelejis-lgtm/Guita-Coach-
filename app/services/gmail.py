@@ -12,12 +12,12 @@ from ..config import get_settings
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 
 _INCOME_PATTERNS = re.compile(
-    r"recibiste|te acreditaron|transferencia recibida|deposito recibido|acreditaci[oó]n",
+    r"recibiste|te acreditaron|transferencia recibida|deposito recibido|acreditaci[oó]n"
+    r"|you received|payment received|funds received|money received",
     re.IGNORECASE
 )
 
 def _is_income_email(subject_or_body: str) -> bool:
-    """Returns True if the text indicates the user received money."""
     return bool(_INCOME_PATTERNS.search(subject_or_body))
 
 def _extract_sender_name(msg: dict) -> str:
@@ -54,11 +54,13 @@ async def exchange_code(code: str) -> dict:
         return r.json()
 
 async def fetch_payment_emails(access_token: str, max_results: int = 400) -> list[dict]:
-    """Busca emails de confirmación de pagos en Gmail."""
+    """Busca emails de confirmación de pagos en Gmail (español e inglés)."""
     import httpx
     query = (
         "(pago OR compra OR factura OR confirmación OR pagaste OR "
-        "recibiste OR acreditaron OR transferencia OR débito OR cobro) newer_than:180d"
+        "recibiste OR acreditaron OR transferencia OR débito OR cobro OR "
+        "invoice OR receipt OR payment OR charged OR subscription OR billing OR "
+        "your order OR amount due OR total due) newer_than:180d"
     )
     headers = {"Authorization": f"Bearer {access_token}"}
 
@@ -89,21 +91,26 @@ async def fetch_payment_emails(access_token: str, max_results: int = 400) -> lis
 
 _PROMO_PATTERNS = re.compile(
     r"hasta \$|gan[aá]|sorteo|descuento|off\b|promo|oferta|cuotas sin inter[eé]s|"
-    r"suscribite|newsletter|no te pierdas|aprovech[aá]|beneficio|reintegro de hasta",
+    r"suscribite|newsletter|no te pierdas|aprovech[aá]|beneficio|reintegro de hasta|"
+    r"unsubscribe|special offer|limited time|% off|sale ends|free trial|upgrade now",
     re.IGNORECASE,
 )
 
-# Frases transaccionales: el monto se toma SOLO de estas, nunca del email entero
+# Frases transaccionales en español e inglés
 _TX_AMOUNT = re.compile(
     r"(?:pagaste|compra(?:ste)? (?:aprobada |de )?|se debit[oó]|d[eé]bito de|pago (?:de|por|realizado por)|"
-    r"abonaste|total(?: a pagar)?:?|consumo de|factura por|transferiste|enviaste)"
-    r"[^\d$]{0,20}\$\s?([\d.,]+)",
+    r"abonaste|total(?: a pagar)?:?|consumo de|factura por|transferiste|enviaste|"
+    r"amount charged|you (?:were )?charged|total(?: amount)?:?|amount due:?|"
+    r"invoice total:?|payment of|charged to|billed(?: amount)?:?|"
+    r"subscription fee:?|plan:?\s*\w+\s*[-–])"
+    r"[^\d$USD]{0,25}(?:USD\s*|US\$\s*|\$\s*|ARS\s*)?([\d.,]+)",
     re.IGNORECASE,
 )
 
 _INCOME_AMOUNT = re.compile(
-    r"(?:recibiste|te acreditaron|te transfirieron|acreditaci[oó]n de|dep[oó]sito de)"
-    r"[^\d$]{0,20}\$\s?([\d.,]+)",
+    r"(?:recibiste|te acreditaron|te transfirieron|acreditaci[oó]n de|dep[oó]sito de|"
+    r"you received|payment received|funds received|credited to your)"
+    r"[^\d$]{0,20}(?:USD\s*|US\$\s*|\$\s*|ARS\s*)?([\d.,]+)",
     re.IGNORECASE,
 )
 
@@ -154,6 +161,12 @@ def _parse_email(msg: dict, gmail_id: str = "") -> Optional[dict]:
         result["raw_reference"] = unique_id
         return result
 
+    result = _try_parse_english(text, subject, date_str, sender)
+    if result:
+        result.setdefault("tx_type", "expense")
+        result["raw_reference"] = unique_id
+        return result
+
     result = _try_parse_generic(text, subject, date_str, sender)
     if result:
         result.setdefault("tx_type", "expense")
@@ -187,6 +200,45 @@ def _try_parse_mercadopago(text: str, subject: str, date_str: str, sender: str) 
         }
     return None
 
+def _try_parse_english(text: str, subject: str, date_str: str, sender: str) -> Optional[dict]:
+    """Parsea emails de servicios internacionales en inglés (Anthropic, Netflix, Spotify, etc.)."""
+    english_indicators = re.search(
+        r"\b(invoice|receipt|payment|charged|subscription|billing|amount due|total due|your plan)\b",
+        text, re.IGNORECASE
+    )
+    if not english_indicators:
+        return None
+
+    usd_pattern = re.compile(
+        r"(?:total|amount|charged?|payment|invoice|subtotal|plan)[^\d$USD]{0,30}"
+        r"(?:USD\s*|US\$\s*|\$\s*)([\d,]+\.?\d{0,2})",
+        re.IGNORECASE,
+    )
+    matches = usd_pattern.findall(text)
+    if not matches:
+        return None
+
+    try:
+        amounts = [_parse_amount_usd(m) for m in matches]
+        amount = max(a for a in amounts if 1 <= a <= 10000)
+    except (ValueError, TypeError):
+        return None
+
+    merchant = _extract_merchant(sender, subject)
+    currency = "USD"
+
+    return {
+        "merchant": merchant or "Servicio internacional",
+        "amount": amount,
+        "currency": currency,
+        "date": _parse_date(date_str),
+        "provider": merchant or "Email",
+        "source": "gmail",
+        "confidence": 0.80,
+        "needs_review": False,
+    }
+
+
 def _try_parse_generic(text: str, subject: str, date_str: str, sender: str) -> Optional[dict]:
     matches = _TX_AMOUNT.findall(text)
     if not matches:
@@ -212,14 +264,56 @@ def _try_parse_generic(text: str, subject: str, date_str: str, sender: str) -> O
 def _parse_amount(s: str) -> float:
     return float(s.replace(".", "").replace(",", "."))
 
+_KNOWN_DOMAINS: dict[str, str] = {
+    "mercadopago": "Mercado Pago",
+    "rappi": "Rappi",
+    "pedidosya": "PedidosYa",
+    "edenor": "EDENOR",
+    "metrogas": "METROGAS",
+    "netflix": "Netflix",
+    "spotify": "Spotify",
+    "amazon": "Amazon",
+    "anthropic": "Claude / Anthropic",
+    "google": "Google",
+    "apple": "Apple",
+    "microsoft": "Microsoft",
+    "openai": "OpenAI",
+    "github": "GitHub",
+    "digitalocean": "DigitalOcean",
+    "railway": "Railway",
+    "vercel": "Vercel",
+    "paypal": "PayPal",
+    "stripe": "Stripe",
+    "uber": "Uber",
+    "cabify": "Cabify",
+    "flow": "Flow",
+    "personal": "Personal",
+    "claro": "Claro",
+    "movistar": "Movistar",
+    "fibertel": "Fibertel",
+    "telecentro": "Telecentro",
+    "directv": "DirecTV",
+}
+
+
+def _parse_amount_usd(s: str) -> float:
+    """Parsea montos en formato US (1,234.56) y AR (1.234,56)."""
+    s = s.strip()
+    if "," in s and "." in s:
+        if s.index(",") < s.index("."):
+            return float(s.replace(",", ""))
+        else:
+            return float(s.replace(".", "").replace(",", "."))
+    if "," in s:
+        return float(s.replace(",", "."))
+    return float(s.replace(".", "").replace(",", ".") if s.count(".") > 1 else s)
+
+
 def _extract_merchant(sender: str, subject: str) -> str:
     domain_match = re.search(r"@([a-z0-9\-]+)\.", sender.lower())
     if domain_match:
         domain = domain_match.group(1)
-        known = {"mercadopago": "Mercado Pago", "rappi": "Rappi", "pedidosya": "PedidosYa",
-                 "edenor": "EDENOR", "metrogas": "METROGAS", "netflix": "Netflix",
-                 "spotify": "Spotify", "amazon": "Amazon", "google": "Google"}
-        return known.get(domain, domain.capitalize())
+        return _KNOWN_DOMAINS.get(domain, domain.capitalize())
     return subject.split("–")[0].split("-")[0].strip()[:40]
 
 def _parse_date(date_str: str) -> str:
