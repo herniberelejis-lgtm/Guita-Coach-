@@ -19,11 +19,6 @@ from ..services.investment_calculator import (
 router = APIRouter(prefix="/api/investments", tags=["investments"])
 
 
-class PriceUpdate(BaseModel):
-    """Request schema for updating ticker price."""
-    ticker: str
-    price: float
-    currency: str = "ARS"
 
 
 class HoldingResponse(BaseModel):
@@ -65,11 +60,6 @@ class UploadResponse(BaseModel):
     saved: int
 
 
-class PriceResponse(BaseModel):
-    """Response schema for price update."""
-    ok: bool
-    ticker: str
-    price: float
 
 
 def _is_duplicate_transaction(
@@ -397,37 +387,8 @@ def get_summary(
     )
 
 
-@router.post("/price", response_model=PriceResponse)
-def update_price(
-    payload: PriceUpdate,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-) -> PriceResponse:
-    """
-    Manually update ticker price (MVP).
-
-    Save/update InvestmentPrice record.
-    """
-    # Get or create price record
-    price_record = db.query(InvestmentPrice).filter(
-        InvestmentPrice.ticker == payload.ticker
-    ).first()
-
-    if not price_record:
-        price_record = InvestmentPrice(
-            ticker=payload.ticker,
-            price=payload.price,
-            currency=payload.currency,
-        )
-        db.add(price_record)
-    else:
-        price_record.price = payload.price
-        price_record.currency = payload.currency
-
-    db.commit()
-
-    return PriceResponse(
-        ok=True,
-        ticker=payload.ticker,
-        price=payload.price,
-    )
+# NOTE: Price update endpoint disabled for MVP
+# Removed due to cross-tenant security concerns (all users share InvestmentPrice table)
+# Will be properly implemented in Phase C with BYMA API integration
+# For testing: prices default to 0.0 in InvestmentPrice table
+# Can be updated directly in database if needed during development

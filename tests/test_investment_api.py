@@ -468,81 +468,9 @@ class TestGetSummary:
         assert response.status_code == 401
 
 
-class TestUpdatePrice:
-    """Test POST /api/investments/price endpoint."""
-
-    def test_update_price_new_ticker(self, authenticated_client):
-        """Test updating price for a new ticker."""
-        response = authenticated_client.post(
-            "/api/investments/price",
-            json={"ticker": "GGAL", "price": 155.50, "currency": "ARS"},
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["ok"] is True
-        assert data["ticker"] == "GGAL"
-        assert data["price"] == 155.50
-
-        # Verify it was saved
-        TestingSession = _get_testing_session(authenticated_client)
-        db = TestingSession()
-        price_record = db.query(InvestmentPrice).filter_by(ticker="GGAL").first()
-        assert price_record is not None
-        assert price_record.price == 155.50
-        assert price_record.currency == "ARS"
-        db.close()
-
-    def test_update_price_existing_ticker(self, authenticated_client):
-        """Test updating price for an existing ticker."""
-        TestingSession = _get_testing_session(authenticated_client)
-        db = TestingSession()
-
-        # Create initial price
-        price = InvestmentPrice(ticker="GGAL", price=150.0, currency="ARS")
-        db.add(price)
-        db.commit()
-        db.close()
-
-        # Update price
-        response = authenticated_client.post(
-            "/api/investments/price",
-            json={"ticker": "GGAL", "price": 160.0, "currency": "ARS"},
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["price"] == 160.0
-
-        # Verify update
-        db = TestingSession()
-        price_record = db.query(InvestmentPrice).filter_by(ticker="GGAL").first()
-        assert price_record.price == 160.0
-        db.close()
-
-    def test_update_price_default_currency(self, authenticated_client):
-        """Test that currency defaults to ARS."""
-        response = authenticated_client.post(
-            "/api/investments/price",
-            json={"ticker": "GGAL", "price": 155.50},
-        )
-
-        assert response.status_code == 200
-
-        # Verify default currency
-        TestingSession = _get_testing_session(authenticated_client)
-        db = TestingSession()
-        price_record = db.query(InvestmentPrice).filter_by(ticker="GGAL").first()
-        assert price_record.currency == "ARS"
-        db.close()
-
-    def test_update_price_unauthenticated(self, client):
-        """Test updating price without authentication returns 401."""
-        response = client.post(
-            "/api/investments/price",
-            json={"ticker": "GGAL", "price": 155.50},
-        )
-        assert response.status_code == 401
+# TestUpdatePrice class removed
+# POST /api/investments/price endpoint disabled for MVP due to cross-tenant security concerns
+# Will be properly implemented in Phase C with BYMA API integration
 
 
 class TestIntegration:
