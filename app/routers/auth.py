@@ -1,5 +1,6 @@
 """Auth: registro/login con sesiones + OAuth flows para Gmail y Mercado Pago."""
 import secrets
+import time
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -78,6 +79,17 @@ def me(user: User = Depends(get_current_user)):
 
 
 # ─── Login social (Google / Mercado Pago) ───────────────────────────────────
+# Store oauth states with expiration (600 seconds = 10 minutes)
+_oauth_login_states: dict[str, float] = {}
+
+
+def _cleanup_expired_states():
+    """Remove expired states."""
+    now = time.time()
+    expired = [s for s, t in _oauth_login_states.items() if now - t > 600]
+    for s in expired:
+        del _oauth_login_states[s]
+
 
 @router.get("/providers")
 def login_providers():
@@ -90,18 +102,20 @@ def login_providers():
     }
 
 
-def _login_state(response: Response) -> str:
-    """Generate state and store in cookie (survives redeploys)."""
+def _login_state() -> str:
+    """Generate state and store with expiration timestamp."""
+    _cleanup_expired_states()
     state = secrets.token_urlsafe(16)
-    response.set_cookie("oauth_state", state, max_age=600, httponly=True, samesite="lax")
+    _oauth_login_states[state] = time.time()
     return state
 
 
-def _check_login_state(request: Request, state: str) -> None:
-    """Validate state from cookie."""
-    cookie_state = request.cookies.get("oauth_state")
-    if not cookie_state or cookie_state != state:
+def _check_login_state(state: str) -> None:
+    """Validate state."""
+    _cleanup_expired_states()
+    if state not in _oauth_login_states:
         raise HTTPException(400, "Estado OAuth inválido")
+    del _oauth_login_states[state]
 
 
 def _find_or_create_user(db: Session, email: str, name: str) -> User:
@@ -120,7 +134,7 @@ def _find_or_create_user(db: Session, email: str, name: str) -> User:
 
 
 @router.get("/google/login")
-def google_login(response: Response):
+def google_login():
     settings = get_settings()
     if not settings.gmail_enabled:
         raise HTTPException(400, "Login con Google no configurado. Agregá GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en .env")
@@ -131,13 +145,13 @@ def google_login(response: Response):
         f"&redirect_uri={redirect}"
         "&response_type=code"
         "&scope=openid%20email%20profile"
-        f"&state={_login_state(response)}"
+        f"&state={_login_state()}"
     )
 
 
 @router.get("/google/login/callback")
-async def google_login_callback(request: Request, code: str, state: str, db: Session = Depends(get_db)):
-    _check_login_state(request, state)
+async def google_login_callback(code: str, state: str, db: Session = Depends(get_db)):
+    _check_login_state(state)
     import httpx
     settings = get_settings()
     async with httpx.AsyncClient(timeout=20) as client:
@@ -169,7 +183,7 @@ async def google_login_callback(request: Request, code: str, state: str, db: Ses
 
 
 @router.get("/mp/login")
-def mp_login(response: Response):
+def mp_login():
     settings = get_settings()
     if not settings.mp_enabled:
         raise HTTPException(400, "Login con Mercado Pago no configurado. Agregá MP_CLIENT_ID y MP_CLIENT_SECRET en .env")
@@ -179,13 +193,13 @@ def mp_login(response: Response):
         f"?client_id={settings.mp_client_id}"
         f"&redirect_uri={redirect}"
         "&response_type=code"
-        f"&state={_login_state(response)}"
+        f"&state={_login_state()}"
     )
 
 
 @router.get("/mp/login/callback")
-async def mp_login_callback(request: Request, code: str, state: str, db: Session = Depends(get_db)):
-    _check_login_state(request, state)
+async def mp_login_callback(code: str, state: str, db: Session = Depends(get_db)):
+    _check_login_state(state)
     import httpx
     settings = get_settings()
     async with httpx.AsyncClient(timeout=20) as client:
