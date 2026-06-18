@@ -1,8 +1,8 @@
-"""Investment CSV parser for Argentine brokers: Cocos Capital, Invertir Online, Bull Market.
+"""Investment CSV/XLSX parser for Argentine brokers: Cocos Capital, Invertir Online, Bull Market.
 
-Each broker exports transactions in a different CSV format. This module:
+Each broker exports transactions in a different format. This module:
 1. Auto-detects the broker format by inspecting headers
-2. Parses the CSV according to broker-specific format
+2. Parses the file according to broker-specific format
 3. Returns standardized transaction dicts with keys:
    - date (YYYY-MM-DD format)
    - tx_type ("buy" or "sell")
@@ -18,11 +18,18 @@ Handles edge cases:
 - European and US number formats (1.234,56 vs 1,234.56)
 - Non-ASCII characters
 - UTF-8 and Latin-1 encodings
+- Excel files (.xlsx) with openpyxl
 """
 import csv
 import io
 import re
 from typing import Optional, Tuple
+
+try:
+    from openpyxl import load_workbook
+    OPENPYXL_AVAILABLE = True
+except ImportError:
+    OPENPYXL_AVAILABLE = False
 
 
 _DATE_PATTERNS = (
@@ -389,3 +396,182 @@ def parse_csv(csv_bytes: bytes) -> Tuple[Optional[str], list[dict]]:
         items = []
 
     return broker, items
+
+
+def _detect_broker_from_rows(rows: list[list]) -> Optional[str]:
+    """Auto-detect broker format from row headers.
+
+    Returns one of: "cocos_capital", "invertir_online", "bull_market", or None.
+    """
+    if not rows:
+        return None
+
+    headers = _get_headers_lower(rows[0])
+
+    if "especie" in headers and "comision" in headers:
+        return "cocos_capital"
+
+    if "isin" in headers and "liquidacion" in headers:
+        return "invertir_online"
+
+    if "simbolo" in headers:
+        return "bull_market"
+
+    return None
+
+
+def _rows_to_transactions(rows: list[list], broker: str) -> list[dict]:
+    """Convert Excel rows to standardized transactions for given broker.
+
+    Args:
+        rows: List of lists (first row is headers)
+        broker: One of "cocos_capital", "invertir_online", "bull_market"
+
+    Returns:
+        List of standardized transaction dicts
+    """
+    if not rows or broker not in ("cocos_capital", "invertir_online", "bull_market"):
+        return []
+
+    headers = _get_headers_lower(rows[0])
+
+    col_indices = {}
+    for i, h in enumerate(headers):
+        if "fecha" in h:
+            col_indices["fecha"] = i
+        elif "tipo" in h:
+            col_indices["tipo"] = i
+        elif "especie" in h:
+            col_indices["especie"] = i
+        elif "simbolo" in h:
+            col_indices["simbolo"] = i
+        elif "isin" in h:
+            col_indices["isin"] = i
+        elif "cantidad" in h:
+            col_indices["cantidad"] = i
+        elif "precio" in h:
+            col_indices["precio"] = i
+
+    required = {"fecha", "cantidad", "precio"}
+    if broker == "cocos_capital":
+        required.add("tipo")
+        required.add("especie")
+    elif broker == "invertir_online":
+        required.add("especie")
+    elif broker == "bull_market":
+        required.add("simbolo")
+
+    if not required.issubset(col_indices.keys()):
+        return []
+
+    items = []
+    for row in rows[1:]:
+        if len(row) <= max(col_indices.values()):
+            continue
+
+        date_val = row[col_indices["fecha"]]
+        if isinstance(date_val, str):
+            date = _parse_date(date_val)
+        else:
+            try:
+                from datetime import datetime
+                if isinstance(date_val, datetime):
+                    date = date_val.strftime("%Y-%m-%d")
+                else:
+                    date = None
+            except Exception:
+                date = None
+
+        if not date:
+            continue
+
+        if broker == "cocos_capital":
+            tx_type_raw = str(row[col_indices["tipo"]]).strip()
+            tx_type = "sell" if "venta" in tx_type_raw.lower() else "buy"
+            ticker = str(row[col_indices["especie"]]).strip().upper()
+        elif broker == "invertir_online":
+            tx_type = "buy"
+            ticker = str(row[col_indices["especie"]]).strip().upper()
+        else:  # bull_market
+            tx_type = "buy"
+            ticker = str(row[col_indices["simbolo"]]).strip().upper()
+
+        if not ticker:
+            continue
+
+        qty_val = row[col_indices["cantidad"]]
+        quantity = _parse_amount(str(qty_val)) if not isinstance(qty_val, (int, float)) else float(qty_val)
+        if quantity is None or quantity <= 0:
+            continue
+
+        price_val = row[col_indices["precio"]]
+        price = _parse_amount(str(price_val)) if not isinstance(price_val, (int, float)) else float(price_val)
+        if price is None or price <= 0:
+            continue
+
+        csv_reference = f"{broker}_{date}_{ticker}_{quantity}"
+
+        items.append({
+            "date": date,
+            "tx_type": tx_type,
+            "ticker": ticker,
+            "quantity": quantity,
+            "price": price,
+            "broker": broker,
+            "csv_reference": csv_reference,
+        })
+
+    return items
+
+
+def parse_xlsx(xlsx_bytes: bytes) -> Tuple[Optional[str], list[dict]]:
+    """Parse Excel file (.xlsx) for investment transactions.
+
+    Auto-detects broker format from headers.
+    Returns tuple of (broker_name, items_list).
+    """
+    if not OPENPYXL_AVAILABLE:
+        return None, []
+
+    try:
+        from io import BytesIO
+        wb = load_workbook(BytesIO(xlsx_bytes))
+        ws = wb.active
+
+        rows = []
+        for row in ws.iter_rows(values_only=True):
+            row_list = [str(cell) if cell is not None else "" for cell in row]
+            rows.append(row_list)
+
+        if not rows:
+            return None, []
+
+        broker = _detect_broker_from_rows(rows)
+        if not broker:
+            return None, []
+
+        items = _rows_to_transactions(rows, broker)
+        return broker, items
+
+    except Exception:
+        return None, []
+
+
+def parse_file(file_bytes: bytes, filename: str) -> Tuple[Optional[str], list[dict]]:
+    """Parse investment file (CSV or XLSX) by extension.
+
+    Args:
+        file_bytes: Raw file content
+        filename: Original filename to detect format
+
+    Returns:
+        Tuple of (broker_name, items_list)
+    """
+    filename_lower = (filename or "").lower()
+
+    if filename_lower.endswith(".xlsx"):
+        return parse_xlsx(file_bytes)
+    elif filename_lower.endswith(".csv"):
+        return parse_csv(file_bytes)
+    else:
+        return None, []

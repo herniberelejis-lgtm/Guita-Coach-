@@ -9,7 +9,7 @@ from sqlalchemy import and_
 from ..database import get_db
 from ..models import User, Investment, InvestmentTransaction, InvestmentPrice
 from ..security import get_current_user
-from ..services.investment_parser import parse_csv
+from ..services.investment_parser import parse_file
 from ..services.investment_calculator import (
     calculate_weighted_avg_cost,
     calculate_pnl_unrealized,
@@ -153,8 +153,9 @@ async def upload_csv(
     user: User = Depends(get_current_user),
 ) -> UploadResponse:
     """
-    Upload CSV from broker.
+    Upload investment file (CSV or XLSX) from broker.
 
+    - Accepts .csv and .xlsx files
     - Auto-detects broker format
     - Parses transactions
     - Saves to database (creates Investment & InvestmentTransaction records)
@@ -164,18 +165,18 @@ async def upload_csv(
         ok: bool, broker: str (or None), fetched: int, saved: int
     """
     # Validate file type
-    if not file.filename.endswith(".csv"):
-        raise HTTPException(400, "File must be CSV format")
+    if not (file.filename.endswith(".csv") or file.filename.endswith(".xlsx")):
+        raise HTTPException(400, "File must be CSV or XLSX format")
 
     # Validate file size (5MB limit)
     content = await file.read()
     if len(content) > 5 * 1024 * 1024:
         raise HTTPException(413, "File too large (max 5MB)")
 
-    # Parse CSV
-    broker, items = parse_csv(content)
+    # Parse file (CSV or XLSX)
+    broker, items = parse_file(content, file.filename)
     if broker is None:
-        raise HTTPException(400, "CSV format not recognized")
+        raise HTTPException(400, "File format not recognized")
 
     # Process transactions
     saved_count = 0

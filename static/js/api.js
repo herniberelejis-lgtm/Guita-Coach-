@@ -41,6 +41,7 @@ const API = {
   // Investments
   getInvestmentSummary: () => API.get('/investments/summary'),
   getInvestmentHoldings: () => API.get('/investments/holdings'),
+  getInvestmentHistory: () => API.get('/investments/history'),
   uploadInvestmentCSV: (file) => {
     const form = new FormData();
     form.append('file', file);
