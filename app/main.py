@@ -7,7 +7,7 @@ import os
 from .database import init_db
 from .routers import auth, budget, transactions, insights, sync, advisor, chat, goals, investments
 
-app = FastAPI(title="Guita Coach", version="0.1.0", docs_url="/api/docs")
+app = FastAPI(title="Guita Coach", version="0.2.0", docs_url="/api/docs")
 
 # ─── DB init on startup ───────────────────────────────────────────────────────
 @app.on_event("startup")
