@@ -1,6 +1,6 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, Text, DateTime
-from sqlalchemy.orm import declarative_base
-from datetime import datetime
+from sqlalchemy import Column, Integer, String, Float, Boolean, Text, DateTime, Date, ForeignKey, UniqueConstraint
+from sqlalchemy.orm import declarative_base, relationship
+from datetime import datetime, date
 
 Base = declarative_base()
 
@@ -17,6 +17,9 @@ class User(Base):
     payday = Column(Integer, default=1)
     onboarding_done = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    investments = relationship("Investment", back_populates="user", cascade="all, delete-orphan")
+    investment_transactions = relationship("InvestmentTransaction", back_populates="user", cascade="all, delete-orphan")
 
 class Connection(Base):
     __tablename__ = "connections"
@@ -118,3 +121,53 @@ class CategoryRule(Base):
     subcategory = Column(String)
     priority = Column(Integer, default=0)
     from_correction = Column(Boolean, default=False)
+
+
+class Investment(Base):
+    """Individual investment position (stock, ETF, bond, etc.)."""
+    __tablename__ = "investment"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    broker = Column(String, nullable=False)  # "cocos_capital", "invertir_online", "bull_market"
+    ticker = Column(String, nullable=False)
+    quantity = Column(Float, nullable=False, default=0)
+    avg_cost = Column(Float, nullable=False, default=0)
+    purchase_date = Column(Date, nullable=False)
+    status = Column(String, nullable=False, default="open")  # "open" or "closed"
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", back_populates="investments")
+    transactions = relationship("InvestmentTransaction", back_populates="investment", cascade="all, delete-orphan")
+
+    __table_args__ = (UniqueConstraint('user_id', 'ticker', 'broker', name='uq_user_ticker_broker'),)
+
+
+class InvestmentTransaction(Base):
+    """Buy/sell transactions for investments."""
+    __tablename__ = "investment_transaction"
+    id = Column(Integer, primary_key=True)
+    investment_id = Column(Integer, ForeignKey("investment.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    broker = Column(String, nullable=False)
+    ticker = Column(String, nullable=False)
+    tx_type = Column(String, nullable=False)  # "buy" or "sell"
+    quantity = Column(Float, nullable=False)
+    price = Column(Float, nullable=False)
+    date = Column(Date, nullable=False)
+    csv_reference = Column(String, nullable=True)
+    linked_transaction_id = Column(Integer, ForeignKey("transactions.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    investment = relationship("Investment", back_populates="transactions")
+    user = relationship("User", back_populates="investment_transactions")
+
+
+class InvestmentPrice(Base):
+    """Current market price for investment tickers."""
+    __tablename__ = "investment_price"
+    id = Column(Integer, primary_key=True)
+    ticker = Column(String, unique=True, nullable=False)
+    price = Column(Float, nullable=False)
+    currency = Column(String, default="ARS")
+    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
