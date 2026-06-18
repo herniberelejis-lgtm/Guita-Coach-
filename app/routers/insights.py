@@ -3,10 +3,15 @@ from collections import Counter
 from datetime import date
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 from ..database import get_db
-from ..models import User, Transaction
+from ..models import User, Transaction, Investment, InvestmentPrice, InvestmentTransaction
 from ..security import get_current_user
 from ..services.splits import expense_amount, reimbursement_map
+from ..services.investment_calculator import (
+    calculate_pnl_unrealized,
+    calculate_portfolio_summary,
+)
 
 router = APIRouter(prefix="/api/insights", tags=["insights"])
 
@@ -215,3 +220,119 @@ def summary_stats(db: Session = Depends(get_db), user: User = Depends(get_curren
         })
 
     return result
+
+
+@router.get("/dashboard")
+def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """
+    Get comprehensive dashboard with financial and investment metrics.
+
+    Returns:
+        Dashboard data including:
+        - monthly_income
+        - total_spent (current month)
+        - total_budget
+        - days_remaining
+        - investment summary (total_invested, total_current_value, total_pnl)
+    """
+    # Get current month
+    now = date.today()
+    month = now.strftime("%Y-%m")
+
+    # Get income
+    income = user.monthly_income or 0
+
+    # Get transactions for current month
+    txs = db.query(Transaction).filter(
+        Transaction.user_id == user.id,
+        Transaction.month == month,
+        Transaction.status.in_(["confirmed", "classified"]),
+    ).all()
+
+    # Filter for expenses
+    expense_txs = [
+        t for t in txs
+        if getattr(t, "tx_type", "expense") == "expense"
+        and not getattr(t, "is_internal_transfer", False)
+        and not getattr(t, "is_duplicate", False)
+    ]
+
+    total_spent = sum(t.amount for t in expense_txs)
+
+    # Calculate days remaining in month
+    days_in_month = (
+        (date(now.year, now.month % 12 + 1, 1) - date(now.year, now.month, 1)).days
+        if now.month < 12
+        else (date(now.year + 1, 1, 1) - date(now.year, now.month, 1)).days
+    )
+    days_passed = now.day
+    days_remaining = days_in_month - days_passed
+
+    # Get investment summary
+    open_investments = db.query(Investment).filter(
+        and_(
+            Investment.user_id == user.id,
+            Investment.status == "open",
+        )
+    ).all()
+
+    # Build holdings list for calculator
+    holdings = []
+    for inv in open_investments:
+        # Get current price
+        price_record = db.query(InvestmentPrice).filter(
+            InvestmentPrice.ticker == inv.ticker
+        ).first()
+        current_price = price_record.price if price_record else 0.0
+
+        holdings.append({
+            "quantity": inv.quantity,
+            "avg_cost": inv.avg_cost,
+            "current_price": current_price,
+        })
+
+    # Calculate realized P&L from closed positions
+    closed_investments = db.query(Investment).filter(
+        and_(
+            Investment.user_id == user.id,
+            Investment.status == "closed",
+        )
+    ).all()
+
+    realized_pnl = 0.0
+    for inv in closed_investments:
+        # Get buy and sell transactions for this investment
+        buy_txs = db.query(InvestmentTransaction).filter(
+            and_(
+                InvestmentTransaction.investment_id == inv.id,
+                InvestmentTransaction.tx_type == "buy",
+            )
+        ).all()
+
+        sell_txs = db.query(InvestmentTransaction).filter(
+            and_(
+                InvestmentTransaction.investment_id == inv.id,
+                InvestmentTransaction.tx_type == "sell",
+            )
+        ).all()
+
+        # Calculate realized P&L from closed positions
+        total_buy_cost = sum(tx.quantity * tx.price for tx in buy_txs)
+        total_sell_value = sum(tx.quantity * tx.price for tx in sell_txs)
+        realized_pnl += total_sell_value - total_buy_cost
+
+    # Use calculator to compute summary
+    investment_summary = calculate_portfolio_summary(holdings, realized_pnl)
+
+    return {
+        "month": month,
+        "income": income,
+        "total_spent": total_spent,
+        "total_budget": income,
+        "days_remaining": days_remaining,
+        "investments": {
+            "total_invested": investment_summary["total_invested"],
+            "total_current_value": investment_summary["total_current_value"],
+            "total_pnl": investment_summary["total_pnl"],
+        },
+    }
