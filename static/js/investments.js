@@ -172,7 +172,6 @@ const Investments = {
           accept: '.csv,.xlsx',
           id: 'file-input',
           style: 'display:none',
-          onchange: (e) => this._handleFileSelect(e),
         }),
       ),
 
@@ -183,6 +182,9 @@ const Investments = {
 
     const zone = document.getElementById('upload-zone');
     const fileInput = document.getElementById('file-input');
+
+    // Use arrow function to keep 'this' context
+    fileInput.addEventListener('change', (e) => this._handleFileSelect(e));
 
     zone.addEventListener('click', () => fileInput.click());
     zone.addEventListener('dragover', e => {

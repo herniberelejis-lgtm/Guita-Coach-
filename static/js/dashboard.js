@@ -118,6 +118,32 @@ function _buildDashboard(budget, insights) {
   );
   frag.appendChild(header);
 
+  // Connection banners (Gmail / Mercado Pago)
+  const syncStatus = App.state.syncStatus || {};
+  const gmail = syncStatus.gmail?.status === 'connected';
+  const mp = syncStatus.mercadopago?.status === 'connected';
+  if (!gmail || !mp) {
+    const banner = _el('div', { style: 'background:var(--color-bg-secondary);border-left:4px solid var(--color-accent);padding:16px;border-radius:6px;margin-bottom:20px;' });
+    const msg = _el('p', { style: 'margin:0;font-weight:500;margin-bottom:8px;' },
+      !gmail && !mp ? 'Conectá Gmail y Mercado Pago para sincronizar transacciones' :
+      !gmail ? 'Conectá Gmail para sincronizar correos' :
+      'Conectá Mercado Pago para sincronizar pagos'
+    );
+    banner.appendChild(msg);
+
+    const btns = _el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;' });
+    if (!gmail) btns.appendChild(_el('button', {
+      className: 'btn btn-sm btn-primary',
+      onclick: () => App.navigate('settings')
+    }, '⚙ Conectar Gmail'));
+    if (!mp) btns.appendChild(_el('button', {
+      className: 'btn btn-sm btn-primary',
+      onclick: () => App.navigate('settings')
+    }, '💳 Conectar Mercado Pago'));
+    banner.appendChild(btns);
+    frag.appendChild(banner);
+  }
+
   // Summary metrics card
   const summaryCard = _el('div', { className: 'summary-metrics' });
   const incomeSub = budget.income_is_declared
