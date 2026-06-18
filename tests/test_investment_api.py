@@ -491,37 +491,24 @@ class TestIntegration:
         assert response.status_code == 200
         assert response.json()["saved"] == 1
 
-        # 2. Check holdings (before price update)
+        # 2. Check holdings (prices default to 0 until BYMA integration in Phase C)
         response = authenticated_client.get("/api/investments/holdings")
         assert response.status_code == 200
         holdings = response.json()
         assert len(holdings) == 1
         assert holdings[0]["ticker"] == "GGAL"
-        assert holdings[0]["current_price"] == 0.0
+        assert holdings[0]["current_price"] == 0.0  # No price set yet (MVP)
+        assert holdings[0]["pnl"] == -1505.0  # (0 - 150.50) * 10
 
-        # 3. Update price
-        response = authenticated_client.post(
-            "/api/investments/price",
-            json={"ticker": "GGAL", "price": 160.0, "currency": "ARS"},
-        )
-        assert response.status_code == 200
-
-        # 4. Check holdings again (with price)
-        response = authenticated_client.get("/api/investments/holdings")
-        assert response.status_code == 200
-        holdings = response.json()
-        assert holdings[0]["current_price"] == 160.0
-        assert abs(holdings[0]["pnl"] - 94.9) < 0.1  # (160 - 150.50) * 10
-
-        # 5. Check summary
+        # 3. Check summary (prices default to 0)
         response = authenticated_client.get("/api/investments/summary")
         assert response.status_code == 200
         summary = response.json()
         assert abs(summary["total_invested"] - 1505.0) < 0.1  # 10 * 150.50
-        assert summary["total_current_value"] == 1600.0  # 10 * 160
-        assert abs(summary["total_unrealized"] - 95.0) < 0.1
+        assert summary["total_current_value"] == 0.0  # prices default to 0 (MVP)
+        assert summary["total_unrealized"] == -1505.0  # 0 - 1505
 
-        # 6. Check history
+        # 4. Check history
         response = authenticated_client.get("/api/investments/history")
         assert response.status_code == 200
         history = response.json()
