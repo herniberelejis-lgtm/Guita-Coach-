@@ -59,6 +59,7 @@ def _parse_amount(raw: str) -> Optional[float]:
     Supports:
     - '-1.234,56' (European: thousands separator=dot, decimal=comma)
     - '1,234.56' (US: thousands separator=comma, decimal=dot)
+    - '22,1225' (European with 4 decimals)
     - '$ 500' (with currency symbol)
     - '(300,00)' (parentheses for negative)
 
@@ -81,12 +82,25 @@ def _parse_amount(raw: str) -> Optional[float]:
             raw = raw.replace(",", "")
     elif "," in raw:
         # Only comma: could be European (1,23) or US thousands (1,000)
-        # If comma leaves 1-2 digits after, it's decimal
+        # If comma leaves more than 2 digits after, it's decimal (e.g. 22,1225)
+        # If comma leaves 1-2 digits after, it's decimal (e.g. 1,23)
         head, _, tail = raw.rpartition(",")
-        if len(tail) <= 2:
-            raw = f"{head.replace('.', '')}.{tail}"  # European decimal
+        if head and all(c.isdigit() for c in head):
+            # It's a valid number, comma is decimal
+            raw = f"{head.replace('.', '')}.{tail}"
         else:
-            raw = raw.replace(",", "")  # US thousands
+            raw = raw.replace(",", "")  # US thousands or invalid
+    elif "." in raw:
+        # Only dot: could be thousands separator or decimal point
+        # If dot leaves more than 2 digits, it's thousands separator
+        # If dot leaves 1-2 digits, it's decimal
+        head, _, tail = raw.rpartition(".")
+        if len(tail) <= 2 and head and all(c.isdigit() for c in head):
+            # Decimal point (e.g., "123.45" or "123.5")
+            raw = f"{head}.{tail}"
+        else:
+            # Thousands separator or invalid
+            raw = raw.replace(".", "")
 
     try:
         value = float(raw)
@@ -125,7 +139,7 @@ def detect_broker(csv_bytes: bytes) -> Optional[str]:
     Detection strategy:
     - Cocos Capital: has 'especie' AND 'comision' in headers
     - Invertir Online: has 'isin' AND 'liquidacion' in headers
-    - Bull Market: has 'simbolo' in headers
+    - Bull Market: has 'simbolo' OR ('instrumento' AND 'tipooperacion') in headers
     """
     text = _read_text(csv_bytes)
     if not text:
@@ -147,8 +161,10 @@ def detect_broker(csv_bytes: bytes) -> Optional[str]:
     if "isin" in headers and "liquidacion" in headers:
         return "invertir_online"
 
-    # Check for Bull Market (has simbolo)
+    # Check for Bull Market (has simbolo OR instrumento+tipooperacion)
     if "simbolo" in headers:
+        return "bull_market"
+    if "instrumento" in headers and "tipooperacion" in headers:
         return "bull_market"
 
     return None
@@ -307,8 +323,11 @@ def parse_invertir_online_csv(csv_bytes: bytes) -> list[dict]:
 def parse_bull_market_csv(csv_bytes: bytes) -> list[dict]:
     """Parse Bull Market CSV format.
 
-    Expected columns: Fecha, Simbolo, Cantidad, Precio, Comision, Total
-    Note: Bull Market doesn't export transaction type, so all are treated as buy.
+    Supports two formats:
+    1. Simple: Fecha, Simbolo, Cantidad, Precio
+    2. Full: fechaEjecucion, instrumento, tipoOperacion, cantidad, precio
+
+    Note: Old format treats all as buy. New format detects Compra/Venta.
     """
     text = _read_text(csv_bytes)
     if not text:
@@ -329,14 +348,22 @@ def parse_bull_market_csv(csv_bytes: bytes) -> list[dict]:
             col_indices["fecha"] = i
         elif "simbolo" in h:
             col_indices["simbolo"] = i
+        elif "instrumento" in h:
+            col_indices["instrumento"] = i
+        elif "tipooperacion" in h:
+            col_indices["tipooperacion"] = i
         elif "cantidad" in h:
             col_indices["cantidad"] = i
         elif "precio" in h:
             col_indices["precio"] = i
 
     # Validate we have minimum required columns
-    required = {"fecha", "simbolo", "cantidad", "precio"}
-    if not required.issubset(col_indices.keys()):
+    has_fecha = "fecha" in col_indices
+    has_ticker = "simbolo" in col_indices or "instrumento" in col_indices
+    has_qty = "cantidad" in col_indices
+    has_price = "precio" in col_indices
+
+    if not (has_fecha and has_ticker and has_qty and has_price):
         return []
 
     items = []
@@ -348,23 +375,46 @@ def parse_bull_market_csv(csv_bytes: bytes) -> list[dict]:
         if not date:
             continue
 
-        ticker = row[col_indices["simbolo"]].strip().upper()
+        # Extract ticker from either simbolo or instrumento
+        ticker_raw = ""
+        if "simbolo" in col_indices:
+            ticker_raw = row[col_indices["simbolo"]].strip()
+        elif "instrumento" in col_indices:
+            ticker_raw = row[col_indices["instrumento"]].strip()
+            # Extract ticker from "COMPANY NAME (TICKER)" format
+            if "(" in ticker_raw and ")" in ticker_raw:
+                ticker_raw = ticker_raw[ticker_raw.rfind("(") + 1:ticker_raw.rfind(")")]
+
+        ticker = ticker_raw.upper()
         if not ticker:
             continue
 
-        quantity = _parse_amount(row[col_indices["cantidad"]])
-        if quantity is None or quantity <= 0:
+        quantity_raw = row[col_indices["cantidad"]]
+        quantity = _parse_amount(quantity_raw)
+        if quantity is None or quantity == 0:
             continue
 
-        price = _parse_amount(row[col_indices["precio"]])
+        price_raw = row[col_indices["precio"]]
+        price = _parse_amount(price_raw)
         if price is None or price <= 0:
             continue
+
+        # Detect transaction type from tipoOperacion if available
+        tx_type = "buy"
+        if "tipooperacion" in col_indices:
+            tx_type_raw = row[col_indices["tipooperacion"]].strip().lower()
+            if "venta" in tx_type_raw:
+                tx_type = "sell"
+                quantity = abs(quantity)  # Ensure quantity is positive for sells
+            elif "compra" in tx_type_raw:
+                tx_type = "buy"
+                quantity = abs(quantity)
 
         csv_reference = f"bull_{date}_{ticker}_{quantity}"
 
         items.append({
             "date": date,
-            "tx_type": "buy",  # Bull Market doesn't export transaction type
+            "tx_type": tx_type,
             "ticker": ticker,
             "quantity": quantity,
             "price": price,
