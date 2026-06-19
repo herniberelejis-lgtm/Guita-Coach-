@@ -1,7 +1,5 @@
-/* Investments page — holdings, history, CSV/XLSX upload */
+/* Investments page — single unified view with holdings, history, and upload */
 const Investments = {
-  state: { activeTab: 'holdings' },
-
   async render() {
     const main = document.getElementById('main');
     main.textContent = '';
@@ -15,51 +13,33 @@ const Investments = {
     );
     main.appendChild(header);
 
-    const tabNav = _el('div', { className: 'tab-nav' },
-      _el('button', {
-        className: `tab-btn ${this.state.activeTab === 'holdings' ? 'active' : ''}`,
-        onClick: () => this._switchTab('holdings'),
-      }, 'Posiciones'),
-      _el('button', {
-        className: `tab-btn ${this.state.activeTab === 'history' ? 'active' : ''}`,
-        onClick: () => this._switchTab('history'),
-      }, 'Historial'),
-      _el('button', {
-        className: `tab-btn ${this.state.activeTab === 'upload' ? 'active' : ''}`,
-        onClick: () => this._switchTab('upload'),
-      }, 'Subir'),
-    );
-    main.appendChild(tabNav);
+    // Single unified view
+    const container = _el('div', { className: 'card' });
+    main.appendChild(container);
 
-    const content = _el('div', { className: 'card', id: 'inv-content' });
-    main.appendChild(content);
-
-    this._loadTab(content);
+    await this._loadAllContent(container);
   },
 
-  _switchTab(tab) {
-    this.state.activeTab = tab;
-    const content = document.getElementById('inv-content');
-    if (content) this._loadTab(content);
-    document.querySelectorAll('.tab-btn').forEach(b => {
-      b.classList.toggle('active', b.textContent.toLowerCase().includes(
-        tab === 'holdings' ? 'posic' : tab === 'history' ? 'histor' : 'subir'
-      ));
-    });
-  },
-
-  async _loadTab(container) {
+  async _loadAllContent(container) {
     container.textContent = '';
-    const spinner = _el('div', { className: 'spinner', style: 'display:block;margin:30px auto;' });
-    container.appendChild(spinner);
 
-    if (this.state.activeTab === 'holdings') {
-      await this._loadHoldings(container);
-    } else if (this.state.activeTab === 'history') {
-      await this._loadHistory(container);
-    } else if (this.state.activeTab === 'upload') {
-      this._loadUpload(container);
-    }
+    // Upload section at top
+    container.appendChild(_el('div', { style: 'margin-bottom:40px;' },
+      _el('p', { className: 'section-title' }, 'Subir movimientos'),
+    ));
+    this._loadUpload(container);
+
+    // Holdings section
+    container.appendChild(_el('div', { style: 'margin-top:40px;margin-bottom:40px;' },
+      _el('p', { className: 'section-title' }, 'Posiciones abiertas'),
+    ));
+    await this._loadHoldings(container);
+
+    // History section
+    container.appendChild(_el('div', { style: 'margin-top:40px;' },
+      _el('p', { className: 'section-title' }, 'Historial de transacciones'),
+    ));
+    await this._loadHistory(container);
   },
 
   async _loadHoldings(container) {
