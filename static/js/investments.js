@@ -45,10 +45,11 @@ const Investments = {
   async _loadHoldings(container) {
     try {
       const holdings = await API.getInvestmentHoldings();
-      container.textContent = '';
+      const section = _el('div', {});
 
       if (!holdings.length) {
-        container.appendChild(_el('div', { className: 'empty' }, 'Sin posiciones abiertas'));
+        section.appendChild(_el('div', { className: 'empty' }, 'Sin posiciones abiertas'));
+        container.appendChild(section);
         return;
       }
 
@@ -80,20 +81,22 @@ const Investments = {
         ));
       });
       table.appendChild(tbody);
-      container.appendChild(table);
+      section.appendChild(table);
+      container.appendChild(section);
     } catch (err) {
-      container.textContent = '';
-      container.appendChild(_el('div', { className: 'error' }, 'Error al cargar: ' + err.message));
+      section.appendChild(_el('div', { className: 'error' }, 'Error al cargar: ' + err.message));
+      container.appendChild(section);
     }
   },
 
   async _loadHistory(container) {
     try {
       const history = await API.getInvestmentHistory();
-      container.textContent = '';
+      const section = _el('div', {});
 
       if (!history.length) {
-        container.appendChild(_el('div', { className: 'empty' }, 'Sin historial'));
+        section.appendChild(_el('div', { className: 'empty' }, 'Sin historial'));
+        container.appendChild(section);
         return;
       }
 
@@ -125,16 +128,15 @@ const Investments = {
         ));
       });
       table.appendChild(tbody);
-      container.appendChild(table);
+      section.appendChild(table);
+      container.appendChild(section);
     } catch (err) {
-      container.textContent = '';
-      container.appendChild(_el('div', { className: 'error' }, 'Error al cargar: ' + err.message));
+      section.appendChild(_el('div', { className: 'error' }, 'Error al cargar: ' + err.message));
+      container.appendChild(section);
     }
   },
 
   _loadUpload(container) {
-    container.textContent = '';
-
     const form = _el('div', { className: 'upload-form' },
       _el('h3', {}, 'Sube el estado de tu broker'),
       _el('p', {}, 'Soportamos: Cocos Capital, Invertir Online, Bull Market'),
