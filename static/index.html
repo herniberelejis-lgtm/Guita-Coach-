@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/style.css?v=2">
 </head>
 <body>
 
@@ -289,19 +289,19 @@
 <div id="toast"></div>
 
 <!-- JS — orden importa -->
-<script src="/static/js/api.js"></script>
-<script src="/static/js/auth.js"></script>
-<script src="/static/js/dashboard.js"></script>
-<script src="/static/js/transactions.js"></script>
-<script src="/static/js/insights.js"></script>
-<script src="/static/js/settings.js"></script>
-<script src="/static/js/chat.js"></script>
-<script src="/static/js/goals.js"></script>
-<script src="/static/js/investments.js"></script>
-<script src="/static/js/app.js"></script>
+<script src="/static/js/api.js?v=2"></script>
+<script src="/static/js/auth.js?v=2"></script>
+<script src="/static/js/dashboard.js?v=2"></script>
+<script src="/static/js/transactions.js?v=2"></script>
+<script src="/static/js/insights.js?v=2"></script>
+<script src="/static/js/settings.js?v=2"></script>
+<script src="/static/js/chat.js?v=2"></script>
+<script src="/static/js/goals.js?v=2"></script>
+<script src="/static/js/investments.js?v=2"></script>
+<script src="/static/js/app.js?v=2"></script>
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register('/sw.js?v=' + new Date().getTime()).catch(() => {});
   }
 </script>
 </body>
