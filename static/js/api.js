@@ -47,7 +47,8 @@ const API = {
     form.append('file', file);
     return fetch('/api/investments/upload', {
       method: 'POST',
-      body: form
+      body: form,
+      credentials: 'include'
     }).then(res => res.ok ? res.json() : res.json().then(e => Promise.reject(new Error(e.detail))));
   },
 
