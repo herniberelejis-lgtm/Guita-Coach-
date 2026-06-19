@@ -66,6 +66,8 @@ const Settings = {
     main.appendChild(budgetTitle);
 
     main.appendChild(this._buildBudgetForm(budget));
+
+    await this._loadRecurring(main);
   },
 
   /* Importar estado de cuenta de MP: cubre compras con tarjeta que la API no expone. */
@@ -279,5 +281,84 @@ const Settings = {
     inp.value = value ?? '';
     grp.appendChild(inp);
     return grp;
+  },
+
+  async _loadRecurring(main) {
+    const sec = document.createElement('div');
+    sec.style.marginTop = '40px';
+
+    const title = document.createElement('p');
+    title.className = 'section-title';
+    title.textContent = 'Gastos fijos';
+    sec.appendChild(title);
+
+    const recurring = await API.getRecurring().catch(() => []);
+
+    if (recurring.length) {
+      recurring.forEach(r => {
+        const item = document.createElement('div');
+        item.className = 'card';
+        item.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:12px;margin-bottom:8px;';
+        item.appendChild(document.createTextNode(r.merchant + ' - $' + App.fmt(r.amount) + ' (día ' + r.day_of_month + ')'));
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-sm';
+        btn.textContent = '✕';
+        btn.style.cssText = 'background:#f44;color:#fff;border:none;cursor:pointer;';
+        btn.onclick = async () => {
+          await API.deleteRecurring(r.id);
+          Settings.render();
+        };
+        item.appendChild(btn);
+        sec.appendChild(item);
+      });
+    } else {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = 'Sin gastos fijos';
+      sec.appendChild(empty);
+    }
+
+    const form = document.createElement('form');
+    form.style.cssText = 'margin-top:16px;padding:16px;background:var(--color-bg-secondary);border-radius:8px;';
+    form.appendChild(this._formGroup('Descripción', 'merchant', 'text', ''));
+    form.appendChild(this._formGroup('Monto', 'amount', 'number', ''));
+    form.appendChild(this._formGroup('Día del mes', 'day_of_month', 'number', '1'));
+
+    const catSel = document.createElement('div');
+    catSel.className = 'form-group';
+    const catLbl = document.createElement('label');
+    catLbl.textContent = 'Categoría';
+    catSel.appendChild(catLbl);
+    const catInp = document.createElement('select');
+    catInp.name = 'category';
+    ['necesidades', 'gustos', 'ahorro'].forEach(cat => {
+      const opt = document.createElement('option');
+      opt.value = cat;
+      opt.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+      catInp.appendChild(opt);
+    });
+    catSel.appendChild(catInp);
+    form.appendChild(catSel);
+
+    const btn = document.createElement('button');
+    btn.type = 'submit';
+    btn.className = 'btn btn-primary';
+    btn.textContent = 'Agregar gasto fijo';
+    form.appendChild(btn);
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      await API.createRecurring({
+        merchant: fd.get('merchant'),
+        amount: parseFloat(fd.get('amount')),
+        day_of_month: parseInt(fd.get('day_of_month')),
+        category: fd.get('category'),
+      });
+      Settings.render();
+    });
+
+    sec.appendChild(form);
+    main.appendChild(sec);
   },
 };

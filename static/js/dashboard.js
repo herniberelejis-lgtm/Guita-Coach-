@@ -144,6 +144,19 @@ function _buildDashboard(budget, insights) {
     frag.appendChild(banner);
   }
 
+  // Fixed expenses banner
+  const recurringCount = budget.monthly_committed || 0;
+  if (recurringCount === 0) {
+    const fixedBanner = _el('div', { style: 'background:var(--color-bg-secondary);border-left:4px solid var(--color-accent);padding:16px;border-radius:6px;margin-bottom:20px;' });
+    fixedBanner.appendChild(_el('p', { style: 'margin:0;font-weight:500;margin-bottom:8px;' }, 'Agregá gastos fijos para un presupuesto más preciso'));
+    const fixedBtn = _el('button', {
+      className: 'btn btn-sm btn-primary',
+      onclick: () => App.navigate('settings')
+    }, '➕ Agregar gasto fijo');
+    fixedBanner.appendChild(fixedBtn);
+    frag.appendChild(fixedBanner);
+  }
+
   // Summary metrics card
   const summaryCard = _el('div', { className: 'summary-metrics' });
   const incomeSub = budget.income_is_declared
