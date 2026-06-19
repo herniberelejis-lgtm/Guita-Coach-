@@ -220,19 +220,20 @@ nav a svg { width: 18px; height: 18px; flex-shrink: 0; }
 .form-group label { display: block; font-size: .82rem; color: var(--muted); margin-bottom: 6px; }
 .form-group input, .form-group select {
   width: 100%;
-  background: rgba(255,255,255,0.6);
-  border: 1.5px solid var(--color-border, var(--navy3));
-  border-radius: 8px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1.5px solid var(--color-border);
+  border-radius: 0;
   color: var(--color-text);
-  padding: 10px 14px;
+  padding: 10px 0 10px 0;
   font-family: var(--font-body);
   font-size: .92rem;
-  transition: border-color var(--transition), box-shadow var(--transition);
+  transition: border-color var(--transition);
 }
 .form-group input:focus, .form-group select:focus {
   outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(201,123,74,0.15);
+  border-bottom-color: var(--color-accent);
+  box-shadow: none;
 }
 .form-group input::placeholder { color: var(--color-text-secondary); opacity: 0.7; }
 
@@ -571,11 +572,12 @@ nav a svg { width: 18px; height: 18px; flex-shrink: 0; }
 .social-btn {
   display: flex; align-items: center; justify-content: center; gap: 10px;
   width: 100%; padding: 11px; border-radius: 10px;
-  border: 1px solid var(--navy3); background: var(--bg);
-  color: var(--white); font-family: inherit; font-size: .88rem; font-weight: 600;
+  border: 1.5px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text); font-family: inherit; font-size: .88rem; font-weight: 600;
   cursor: pointer; transition: var(--transition);
 }
-.social-btn:hover:not(:disabled) { border-color: var(--muted); background: var(--navy3); }
+.social-btn:hover:not(:disabled) { border-color: var(--color-accent); background: transparent; }
 .social-btn:disabled { opacity: .45; cursor: not-allowed; }
 
 /* ─── Temas de color (60/30/10) ─────────────────────────────────────────── */
