@@ -6,7 +6,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application
+# Copy application (v2 - force rebuild)
 COPY app/ app/
 COPY static/ static/
 COPY .env* ./
