@@ -31,3 +31,9 @@ build/
 guita-coach/
 .remember/
 tok.tmp
+
+# Windows
+desktop.ini
+Thumbs.db
+htmlcov/
+.coverage

@@ -213,6 +213,19 @@ function _buildDashboard(budget, insights) {
     if (wrap) { wrap.textContent = ''; wrap.appendChild(_buildCategoryList(data)); }
   }).catch(() => {});
 
+  // Desglose por medio de pago
+  const pmCard = _el('div', { className: 'card', style: 'margin-bottom:24px;' },
+    _el('p', { className: 'section-title' }, 'Gastos por medio de pago'),
+    _el('div', { id: 'pm-breakdown' },
+      (() => { const s = document.createElement('div'); s.className = 'spinner'; s.style.cssText = 'display:block;margin:20px auto;'; return s; })()
+    )
+  );
+  frag.appendChild(pmCard);
+  API.getPaymentMethods().then(data => {
+    const wrap = document.getElementById('pm-breakdown');
+    if (wrap) { wrap.textContent = ''; wrap.appendChild(_buildPaymentMethodList(data)); }
+  }).catch(() => {});
+
   // Alerts
   if (budget.alerts?.length) {
     const alertsSection = _el('div', { style: 'margin-bottom:24px;' },
@@ -464,6 +477,40 @@ function _buildCategoryList(data) {
   });
   wrap.appendChild(_el('div', { className: 'cat-total' },
     _el('span', {}, 'Total del mes'),
+    _el('strong', {}, App.fmt(data.total))
+  ));
+  return wrap;
+}
+
+const PM_COLORS = {
+  credito: '#C97B4A', debito: '#5B8DEF', qr: '#5E8C6A',
+  transferencia: '#A855F7', efectivo: '#22C55E', otro: '#9AA0A6',
+};
+
+/* Desglose de gastos por medio de pago (barra proporcional). */
+function _buildPaymentMethodList(data) {
+  if (!data.methods || !data.methods.length) {
+    return _el('div', { className: 'empty' }, 'Sin gastos con medio de pago este mes');
+  }
+  const wrap = _el('div', { className: 'cat-list' });
+  data.methods.forEach(m => {
+    const color = PM_COLORS[m.method] || '#9AA0A6';
+    wrap.appendChild(_el('div', { className: 'cat-row' },
+      _el('span', { className: 'cat-dot', style: 'background:' + color }),
+      _el('div', { className: 'cat-info' },
+        _el('div', { className: 'cat-name' }, m.label),
+        _el('div', { className: 'cat-bar-track' },
+          _el('div', { className: 'cat-bar', style: 'width:' + m.pct + '%;background:' + color })
+        )
+      ),
+      _el('div', { className: 'cat-amounts' },
+        _el('div', { className: 'cat-amount' }, App.fmt(m.amount)),
+        _el('div', { className: 'cat-pct' }, m.pct + '% · ' + m.count + ' movs')
+      )
+    ));
+  });
+  wrap.appendChild(_el('div', { className: 'cat-total' },
+    _el('span', {}, 'Total con medio identificado'),
     _el('strong', {}, App.fmt(data.total))
   ));
   return wrap;

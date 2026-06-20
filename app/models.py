@@ -15,6 +15,7 @@ class User(Base):
     gustos_pct = Column(Float, default=30.0)
     ahorro_pct = Column(Float, default=20.0)
     payday = Column(Integer, default=1)
+    income_is_variable = Column(Boolean, default=False)  # sin sueldo fijo: el presupuesto usa ingresos registrados
     onboarding_done = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -47,6 +48,7 @@ class Transaction(Base):
     category = Column(String)        # necesidades | gustos | ahorro
     subcategory = Column(String)
     status = Column(String, default="new")  # new | classified | reviewed
+    payment_method = Column(String, default="")  # credito | debito | qr | transferencia | efectivo | otro
     confidence = Column(Float, default=0.0)
     rule_used = Column(String)
     ai_reason = Column(Text)
@@ -128,8 +130,10 @@ class Investment(Base):
     __tablename__ = "investment"
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    broker = Column(String, nullable=False)  # "cocos_capital", "invertir_online", "bull_market"
+    broker = Column(String, nullable=False)  # "cocos_capital", "invertir_online", "bull_market", "manual", "crypto_*"
     ticker = Column(String, nullable=False)
+    asset_type = Column(String, nullable=False, default="stock")  # "stock" | "crypto"
+    currency = Column(String, nullable=False, default="ARS")  # moneda del avg_cost
     quantity = Column(Float, nullable=False, default=0)
     avg_cost = Column(Float, nullable=False, default=0)
     purchase_date = Column(Date, nullable=False)
@@ -151,6 +155,8 @@ class InvestmentTransaction(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     broker = Column(String, nullable=False)
     ticker = Column(String, nullable=False)
+    asset_type = Column(String, nullable=False, default="stock")  # "stock" | "crypto"
+    currency = Column(String, nullable=False, default="ARS")
     tx_type = Column(String, nullable=False)  # "buy" or "sell"
     quantity = Column(Float, nullable=False)
     price = Column(Float, nullable=False)
@@ -168,6 +174,7 @@ class InvestmentPrice(Base):
     __tablename__ = "investment_price"
     id = Column(Integer, primary_key=True)
     ticker = Column(String, unique=True, nullable=False)
+    asset_type = Column(String, default="stock")  # "stock" | "crypto"
     price = Column(Float, nullable=False)
     currency = Column(String, default="ARS")
     last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

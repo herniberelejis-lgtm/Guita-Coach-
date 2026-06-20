@@ -77,7 +77,10 @@ async def fetch_movements(access_token: str, days_back: int = 180) -> List[Dict]
                 is_income = bool(my_id) and collector_id == my_id
 
                 description = (item.get("description") or "").strip()
-                is_transfer = item.get("payment_type_id") == "money_transfer"
+                payment_type_id = item.get("payment_type_id")
+                is_transfer = payment_type_id == "money_transfer"
+                from .payment_method import from_mp
+                payment_method = from_mp(payment_type_id, item.get("payment_method_id"))
 
                 if is_income:
                     merchant = description or payer.get("email", "") or "Transferencia recibida"
@@ -96,6 +99,7 @@ async def fetch_movements(access_token: str, days_back: int = 180) -> List[Dict]
                     "month": raw_date[:7],
                     "merchant": merchant,
                     "provider": "MercadoPago",
+                    "payment_method": payment_method,
                     "needs_review": needs_review,
                     "raw_reference": str(item.get("id")),
                 })

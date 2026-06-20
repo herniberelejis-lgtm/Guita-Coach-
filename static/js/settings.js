@@ -207,11 +207,33 @@ const Settings = {
     row1.className = 'grid-2';
     row1.style.marginBottom = '16px';
 
-    const incGrp = this._formGroup('Sueldo mensual ($)', 'monthly_income', 'number', budget.income);
+    const isVariable = !!budget.income_is_variable;
+    const incGrp = this._formGroup(
+      isVariable ? 'Último ingreso ($)' : 'Sueldo mensual ($)',
+      'monthly_income', 'number', budget.income);
     const dayGrp = this._formGroup('Día de cobro', 'payday', 'number', budget.payday);
     row1.appendChild(incGrp);
     row1.appendChild(dayGrp);
     form.appendChild(row1);
+
+    // Modo ingreso variable
+    const varGrp = document.createElement('div');
+    varGrp.className = 'form-group';
+    const varLabel = document.createElement('label');
+    varLabel.style.cssText = 'display:flex;gap:8px;align-items:center;cursor:pointer;';
+    const varCheck = document.createElement('input');
+    varCheck.type = 'checkbox';
+    varCheck.name = 'income_is_variable';
+    varCheck.checked = isVariable;
+    varCheck.style.width = 'auto';
+    varLabel.appendChild(varCheck);
+    varLabel.appendChild(document.createTextNode('No tengo sueldo fijo (ingreso variable)'));
+    varGrp.appendChild(varLabel);
+    const varHint = document.createElement('p');
+    varHint.style.cssText = 'font-size:.76rem;color:var(--muted);margin-top:6px;';
+    varHint.textContent = 'Con ingreso variable, el presupuesto se calcula sobre los ingresos que vas registrando en el mes, no sobre un sueldo fijo. Cargá cada ingreso desde Transacciones → + Agregar → Ingreso.';
+    varGrp.appendChild(varHint);
+    form.appendChild(varGrp);
 
     const pctTitle = document.createElement('p');
     pctTitle.style.cssText = 'font-size:.82rem;color:var(--muted);margin-bottom:10px;';
@@ -256,6 +278,7 @@ const Settings = {
           gustos_pct: g,
           ahorro_pct: a,
           payday: parseInt(fd.get('payday')),
+          income_is_variable: fd.get('income_is_variable') === 'on',
         });
         App.toast('Configuración guardada', 'success');
       } catch (err) {

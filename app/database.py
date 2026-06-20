@@ -18,6 +18,13 @@ def _run_migrations():
         "ALTER TABLE transactions ADD COLUMN is_reimbursement BOOLEAN DEFAULT 0",
         "ALTER TABLE transactions ADD COLUMN reimburses_tx_id INTEGER",
         "ALTER TABLE alerts ADD COLUMN payload TEXT",
+        "ALTER TABLE transactions ADD COLUMN payment_method VARCHAR DEFAULT ''",
+        "ALTER TABLE users ADD COLUMN income_is_variable BOOLEAN DEFAULT 0",
+        "ALTER TABLE investment ADD COLUMN asset_type VARCHAR DEFAULT 'stock'",
+        "ALTER TABLE investment ADD COLUMN currency VARCHAR DEFAULT 'ARS'",
+        "ALTER TABLE investment_transaction ADD COLUMN asset_type VARCHAR DEFAULT 'stock'",
+        "ALTER TABLE investment_transaction ADD COLUMN currency VARCHAR DEFAULT 'ARS'",
+        "ALTER TABLE investment_price ADD COLUMN asset_type VARCHAR DEFAULT 'stock'",
     ]
     with engine.connect() as conn:
         for sql in migrations:

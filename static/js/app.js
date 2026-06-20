@@ -174,6 +174,7 @@ const Onboarding = {
           gustos_pct: g,
           ahorro_pct: a,
           payday: parseInt(fd.get('payday')),
+          income_is_variable: fd.get('income_is_variable') === 'on',
         });
         location.reload();
       } catch (err) {

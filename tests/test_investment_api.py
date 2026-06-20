@@ -106,7 +106,7 @@ class TestUploadCSV:
         )
 
         assert response.status_code == 400
-        assert "not recognized" in response.json()["detail"]
+        assert "no reconocido" in response.json()["detail"]
 
     def test_upload_non_csv_file(self, authenticated_client):
         """Test uploading a non-CSV file."""
@@ -131,7 +131,7 @@ class TestUploadCSV:
         )
 
         assert response.status_code == 413
-        assert "too large" in response.json()["detail"]
+        assert "muy grande" in response.json()["detail"]
 
     def test_upload_csv_duplicate_transactions_skipped(self, authenticated_client):
         """Test that duplicate transactions are silently skipped."""
@@ -215,7 +215,7 @@ class TestGetHoldings:
         assert abs(holdings[0]["pnl_percent"] - 6.67) < 0.1
 
     def test_get_holdings_no_price(self, authenticated_client):
-        """Test getting holdings when price is not set."""
+        """Sin precio de mercado: el precio actual cae al costo promedio (P&L neutro)."""
         TestingSession = _get_testing_session(authenticated_client)
         db = TestingSession()
 
@@ -238,7 +238,10 @@ class TestGetHoldings:
         assert response.status_code == 200
         holdings = response.json()
         assert len(holdings) == 1
-        assert holdings[0]["current_price"] == 0.0
+        # Fallback neutro: sin precio conocido usamos el costo promedio
+        assert holdings[0]["current_price"] == 150.0
+        assert holdings[0]["priced"] is False
+        assert holdings[0]["pnl"] == 0.0
 
     def test_get_holdings_closed_positions_excluded(self, authenticated_client):
         """Test that closed positions are not included in holdings."""
@@ -473,6 +476,41 @@ class TestGetSummary:
 # Will be properly implemented in Phase C with BYMA API integration
 
 
+class TestManualEntry:
+    """Test POST /api/investments/manual endpoint."""
+
+    def test_manual_buy_creates_holding(self, authenticated_client):
+        response = authenticated_client.post("/api/investments/manual", json={
+            "ticker": "btc", "tx_type": "buy", "quantity": 0.5,
+            "price": 1000.0, "date": "2024-03-01", "currency": "USD",
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data["ticker"] == "BTC"
+        assert data["asset_type"] == "crypto"  # inferido
+        assert data["total"] == 500.0
+
+        holdings = authenticated_client.get("/api/investments/holdings").json()
+        assert len(holdings) == 1
+        assert holdings[0]["ticker"] == "BTC"
+        assert holdings[0]["quantity"] == 0.5
+        assert holdings[0]["currency"] == "USD"
+
+    def test_manual_invalid_type(self, authenticated_client):
+        response = authenticated_client.post("/api/investments/manual", json={
+            "ticker": "GGAL", "tx_type": "hold", "quantity": 1,
+            "price": 10.0, "date": "2024-03-01",
+        })
+        assert response.status_code == 400
+
+    def test_manual_requires_auth(self, client):
+        response = client.post("/api/investments/manual", json={
+            "ticker": "GGAL", "tx_type": "buy", "quantity": 1,
+            "price": 10.0, "date": "2024-03-01",
+        })
+        assert response.status_code == 401
+
+
 class TestIntegration:
     """Integration tests for complete investment workflows."""
 
@@ -491,22 +529,22 @@ class TestIntegration:
         assert response.status_code == 200
         assert response.json()["saved"] == 1
 
-        # 2. Check holdings (prices default to 0 until BYMA integration in Phase C)
+        # 2. Holdings: sin precio de mercado, el precio actual cae al costo promedio
         response = authenticated_client.get("/api/investments/holdings")
         assert response.status_code == 200
         holdings = response.json()
         assert len(holdings) == 1
         assert holdings[0]["ticker"] == "GGAL"
-        assert holdings[0]["current_price"] == 0.0  # No price set yet (MVP)
-        assert holdings[0]["pnl"] == -1505.0  # (0 - 150.50) * 10
+        assert abs(holdings[0]["current_price"] - 150.50) < 0.01  # fallback al costo promedio
+        assert holdings[0]["pnl"] == 0.0  # P&L neutro sin precio
 
-        # 3. Check summary (prices default to 0)
+        # 3. Summary: valor actual == invertido cuando no hay precio
         response = authenticated_client.get("/api/investments/summary")
         assert response.status_code == 200
         summary = response.json()
         assert abs(summary["total_invested"] - 1505.0) < 0.1  # 10 * 150.50
-        assert summary["total_current_value"] == 0.0  # prices default to 0 (MVP)
-        assert summary["total_unrealized"] == -1505.0  # 0 - 1505
+        assert abs(summary["total_current_value"] - 1505.0) < 0.1  # fallback neutro
+        assert abs(summary["total_unrealized"]) < 0.1  # ~0
 
         # 4. Check history
         response = authenticated_client.get("/api/investments/history")

@@ -33,6 +33,7 @@ const API = {
     return API.get('/transactions' + (q ? '?' + q : ''));
   },
   getNeedsReview:    () => API.get('/transactions/needs-review'),
+  getPaymentMethods: (month) => API.get('/insights/payment-methods' + (month ? '?month=' + month : '')),
   addTransaction:    (d) => API.post('/transactions', d),
   correctCategory:   (id, d) => API.patch(`/transactions/${id}/category`, d),
   confirmSplit:      (id, d) => API.post(`/transactions/${id}/split-confirm`, d),
@@ -42,6 +43,8 @@ const API = {
   getInvestmentSummary: () => API.get('/investments/summary'),
   getInvestmentHoldings: () => API.get('/investments/holdings'),
   getInvestmentHistory: () => API.get('/investments/history'),
+  addInvestmentManual: (d) => API.post('/investments/manual', d),
+  refreshInvestmentPrices: () => API.post('/investments/refresh-prices'),
   uploadInvestmentCSV: (file) => {
     const form = new FormData();
     form.append('file', file);

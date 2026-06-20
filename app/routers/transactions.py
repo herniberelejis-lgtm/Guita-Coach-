@@ -19,6 +19,7 @@ class ManualTransaction(BaseModel):
     tx_type: str = "expense"
     category: str = ""
     subcategory: str = ""
+    payment_method: str = ""
 
 
 class CategoryCorrection(BaseModel):
@@ -31,6 +32,7 @@ class CategoryCorrection(BaseModel):
 def list_transactions(
     month: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
+    payment_method: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     limit: int = Query(50),
     offset: int = Query(0),
@@ -47,6 +49,9 @@ def list_transactions(
 
     if category:
         q = q.filter(Transaction.category == category)
+
+    if payment_method:
+        q = q.filter(Transaction.payment_method == payment_method)
 
     if search:
         q = q.filter(Transaction.merchant.ilike(f"%{search}%"))
@@ -92,6 +97,7 @@ async def add_manual_transaction(payload: ManualTransaction, db: Session = Depen
             confidence = result.get("confidence", 0.7)
             needs_review = not category
 
+    from ..services.payment_method import normalize_method
     tx = Transaction(
         user_id=user.id,
         source="manual",
@@ -105,6 +111,7 @@ async def add_manual_transaction(payload: ManualTransaction, db: Session = Depen
         subcategory=subcategory,
         status="confirmed",
         confidence=confidence,
+        payment_method=normalize_method(payload.payment_method),
         needs_review=needs_review,
     )
     db.add(tx)
@@ -205,6 +212,7 @@ def _tx_dict(t: Transaction) -> dict:
         "subcategory": t.subcategory,
         "source": t.source,
         "provider": t.provider,
+        "payment_method": getattr(t, "payment_method", "") or "",
         "confidence": t.confidence,
         "needs_review": t.needs_review,
         "is_internal_transfer": bool(getattr(t, "is_internal_transfer", False)),

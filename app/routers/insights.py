@@ -81,6 +81,42 @@ def categories_breakdown(month: str = None, db: Session = Depends(get_db),
     return {"month": month, "total": total, "categories": items}
 
 
+@router.get("/payment-methods")
+def payment_methods_breakdown(month: str = None, db: Session = Depends(get_db),
+                              user: User = Depends(get_current_user)):
+    """Desglose de gastos del mes por medio de pago (crédito/débito/QR/transferencia/efectivo)."""
+    from ..services.payment_method import METHOD_LABELS
+    if not month:
+        month = date.today().strftime("%Y-%m")
+    txs = db.query(Transaction).filter(
+        Transaction.user_id == user.id,
+        Transaction.month == month,
+        Transaction.tx_type == "expense",
+        Transaction.is_internal_transfer == False,
+        Transaction.is_duplicate == False,
+        Transaction.status.in_(["confirmed", "classified"]),
+    ).all()
+    reimb = reimbursement_map(db, user.id)
+
+    by_method: dict = {}
+    for t in txs:
+        method = (getattr(t, "payment_method", "") or "").strip() or "otro"
+        if method not in METHOD_LABELS:
+            method = "otro"
+        e = by_method.setdefault(method, {"amount": 0.0, "count": 0})
+        e["amount"] += expense_amount(t, reimb)
+        e["count"] += 1
+
+    total = sum(e["amount"] for e in by_method.values())
+    items = sorted(
+        ({"method": k, "label": METHOD_LABELS.get(k, k), "amount": v["amount"],
+          "count": v["count"], "pct": round(v["amount"] / total * 100, 1) if total else 0}
+         for k, v in by_method.items()),
+        key=lambda x: x["amount"], reverse=True,
+    )
+    return {"month": month, "total": total, "methods": items}
+
+
 @router.get("/month")
 def month_insights(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     if not user.monthly_income:

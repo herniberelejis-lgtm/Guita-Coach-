@@ -155,22 +155,28 @@ def _parse_email(msg: dict, gmail_id: str = "") -> Optional[dict]:
             }
 
     # Fall through to expense detection
+    from .payment_method import from_text
+    payment_method = from_text(text)
+
     result = _try_parse_mercadopago(text, subject, date_str, sender)
     if result:
         result.setdefault("tx_type", "expense")
         result["raw_reference"] = unique_id
+        result["payment_method"] = payment_method
         return result
 
     result = _try_parse_english(text, subject, date_str, sender)
     if result:
         result.setdefault("tx_type", "expense")
         result["raw_reference"] = unique_id
+        result["payment_method"] = payment_method
         return result
 
     result = _try_parse_generic(text, subject, date_str, sender)
     if result:
         result.setdefault("tx_type", "expense")
         result["raw_reference"] = unique_id
+        result["payment_method"] = payment_method
     return result
 
 def _extract_body(msg: dict) -> str:

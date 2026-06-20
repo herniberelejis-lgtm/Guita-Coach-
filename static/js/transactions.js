@@ -1,6 +1,11 @@
 /* Transactions page — list, search, filter, category edit */
 const Transactions = {
-  state: { page: 0, limit: 30, search: '', category: '', month: '' },
+  state: { page: 0, limit: 30, search: '', category: '', payment: '', month: '' },
+
+  PM_LABELS: {
+    credito: 'Crédito', debito: 'Débito', qr: 'QR / billetera',
+    transferencia: 'Transferencia', efectivo: 'Efectivo', otro: 'Otro',
+  },
 
   async render() {
     const main = document.getElementById('main');
@@ -42,6 +47,18 @@ const Transactions = {
     catSel.onchange = () => { this.state.category = catSel.value; this.state.page = 0; this._load(); };
     filters.appendChild(catSel);
 
+    const pmSel = document.createElement('select');
+    [['', 'Todos los medios'], ['credito', 'Crédito'], ['debito', 'Débito'],
+     ['qr', 'QR / billetera'], ['transferencia', 'Transferencia'],
+     ['efectivo', 'Efectivo'], ['otro', 'Otro']].forEach(([v, l]) => {
+      const opt = document.createElement('option');
+      opt.value = v; opt.textContent = l;
+      if (v === this.state.payment) opt.selected = true;
+      pmSel.appendChild(opt);
+    });
+    pmSel.onchange = () => { this.state.payment = pmSel.value; this.state.page = 0; this._load(); };
+    filters.appendChild(pmSel);
+
     main.appendChild(filters);
 
     // Review notice
@@ -78,6 +95,7 @@ const Transactions = {
     const params = {};
     if (this.state.search) params.search = this.state.search;
     if (this.state.category) params.category = this.state.category;
+    if (this.state.payment) params.payment_method = this.state.payment;
     if (this.state.month) params.month = this.state.month;
     params.limit = this.state.limit;
     params.offset = this.state.page * this.state.limit;
@@ -181,6 +199,12 @@ const Transactions = {
         sub.style.cssText = 'font-size:.75rem;color:var(--muted);margin-left:6px;';
         sub.textContent = t.subcategory;
         tdCat.appendChild(sub);
+      }
+      if (t.payment_method) {
+        const pm = document.createElement('span');
+        pm.className = 'pm-badge ' + t.payment_method;
+        pm.textContent = Transactions.PM_LABELS[t.payment_method] || t.payment_method;
+        tdCat.appendChild(pm);
       }
 
       const tdSrc = tr.insertCell();
@@ -309,10 +333,26 @@ const Transactions = {
     modal.className = 'modal';
 
     const title = document.createElement('h3');
-    title.textContent = 'Agregar transacción manual';
+    title.textContent = 'Agregar movimiento';
     modal.appendChild(title);
 
     const form = document.createElement('form');
+
+    // Toggle Gasto / Ingreso
+    let txType = 'expense';
+    const toggle = document.createElement('div');
+    toggle.className = 'type-toggle';
+    const btnExpense = document.createElement('button');
+    btnExpense.type = 'button';
+    btnExpense.textContent = 'Gasto';
+    btnExpense.className = 'active';
+    const btnIncome = document.createElement('button');
+    btnIncome.type = 'button';
+    btnIncome.textContent = 'Ingreso';
+    toggle.appendChild(btnExpense);
+    toggle.appendChild(btnIncome);
+    form.appendChild(toggle);
+
     const fields = [
       { label: 'Comercio / descripción', name: 'merchant', type: 'text', placeholder: 'ej: Farmacity' },
       { label: 'Monto ($)', name: 'amount', type: 'number', placeholder: '1500' },
@@ -334,6 +374,9 @@ const Transactions = {
       form.appendChild(grp);
     });
 
+    // Campos sólo de gasto (categoría + medio de pago)
+    const expenseFields = document.createElement('div');
+
     const catGroup = document.createElement('div');
     catGroup.className = 'form-group';
     const catLabel = document.createElement('label');
@@ -347,7 +390,33 @@ const Transactions = {
       catSel.appendChild(opt);
     });
     catGroup.appendChild(catSel);
-    form.appendChild(catGroup);
+    expenseFields.appendChild(catGroup);
+
+    const pmGroup = document.createElement('div');
+    pmGroup.className = 'form-group';
+    const pmLabel = document.createElement('label');
+    pmLabel.textContent = 'Medio de pago';
+    pmGroup.appendChild(pmLabel);
+    const pmSel = document.createElement('select');
+    pmSel.name = 'payment_method';
+    [['', 'Sin especificar'], ['credito', 'Tarjeta de crédito'], ['debito', 'Tarjeta de débito'],
+     ['qr', 'QR / billetera'], ['transferencia', 'Transferencia'], ['efectivo', 'Efectivo']].forEach(([v, l]) => {
+      const opt = document.createElement('option');
+      opt.value = v; opt.textContent = l;
+      pmSel.appendChild(opt);
+    });
+    pmGroup.appendChild(pmSel);
+    expenseFields.appendChild(pmGroup);
+    form.appendChild(expenseFields);
+
+    const setType = (type) => {
+      txType = type;
+      btnExpense.classList.toggle('active', type === 'expense');
+      btnIncome.classList.toggle('active', type === 'income');
+      expenseFields.style.display = type === 'expense' ? '' : 'none';
+    };
+    btnExpense.onclick = () => setType('expense');
+    btnIncome.onclick = () => setType('income');
 
     const actions = document.createElement('div');
     actions.style.cssText = 'display:flex;gap:10px;margin-top:20px;';
@@ -368,15 +437,20 @@ const Transactions = {
       e.preventDefault();
       saveBtn.disabled = true;
       const fd = new FormData(form);
+      const payload = {
+        merchant: fd.get('merchant'),
+        amount: parseFloat(fd.get('amount')),
+        date: fd.get('date'),
+        tx_type: txType,
+      };
+      if (txType === 'expense') {
+        payload.category = fd.get('category');
+        payload.payment_method = fd.get('payment_method') || '';
+      }
       try {
-        await API.addTransaction({
-          merchant: fd.get('merchant'),
-          amount: parseFloat(fd.get('amount')),
-          date: fd.get('date'),
-          category: fd.get('category'),
-        });
+        await API.addTransaction(payload);
         ov.classList.remove('open');
-        App.toast('Transacción agregada', 'success');
+        App.toast(txType === 'income' ? 'Ingreso registrado' : 'Gasto agregado', 'success');
         Transactions._load();
       } catch (err) {
         App.toast(err.message, 'error');

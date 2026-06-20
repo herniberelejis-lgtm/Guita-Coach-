@@ -30,6 +30,7 @@ async def _save_transaction_item(item: dict, user_id: int, db: Session) -> bool:
     dup = find_cross_source_duplicate(db, user_id, item)
 
     tx_type = item.get("tx_type", "expense")
+    payment_method = item.get("payment_method", "") or ""
 
     if tx_type == "income":
         tx = Transaction(
@@ -46,6 +47,7 @@ async def _save_transaction_item(item: dict, user_id: int, db: Session) -> bool:
             subcategory="",
             status="confirmed",
             confidence=1.0,
+            payment_method=payment_method,
             needs_review=item.get("needs_review", False),
             raw_reference=raw_ref,
             is_duplicate=dup is not None,
@@ -74,6 +76,7 @@ async def _save_transaction_item(item: dict, user_id: int, db: Session) -> bool:
             confidence=result.get("confidence", 0.7),
             rule_used=result.get("rule_used"),
             ai_reason=result.get("reason"),
+            payment_method=payment_method,
             needs_review=item.get("needs_review", False) or result.get("needs_review", False),
             raw_reference=raw_ref,
             is_duplicate=dup is not None,

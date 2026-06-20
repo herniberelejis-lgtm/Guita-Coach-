@@ -19,6 +19,7 @@ class OnboardingPayload(BaseModel):
     gustos_pct: int = 30
     ahorro_pct: int = 20
     payday: int = 1
+    income_is_variable: bool = False
 
 
 class BudgetUpdatePayload(BaseModel):
@@ -27,10 +28,12 @@ class BudgetUpdatePayload(BaseModel):
     gustos_pct: Optional[int] = None
     ahorro_pct: Optional[int] = None
     payday: Optional[int] = None
+    income_is_variable: Optional[bool] = None
 
 
-def _franja_data(user: User, txs: list, month: str, days_remaining: int = 1, reimb: dict | None = None) -> dict:
-    income = user.monthly_income or 0
+def _franja_data(user: User, txs: list, month: str, days_remaining: int = 1,
+                 reimb: dict | None = None, income_base: float | None = None) -> dict:
+    income = income_base if income_base is not None else (user.monthly_income or 0)
     limits = {
         "necesidades": income * user.necesidades_pct / 100,
         "gustos": income * user.gustos_pct / 100,
@@ -80,10 +83,6 @@ def get_current_budget(db: Session = Depends(get_db), user: User = Depends(get_c
 
     days_remaining = max(days_in_month - days_passed, 1)
     reimb = reimbursement_map(db, user.id)
-    data = _franja_data(user, txs, month, days_remaining=days_remaining, reimb=reimb)
-    data["days_passed"] = days_passed
-    data["days_in_month"] = days_in_month
-    data["days_remaining"] = days_in_month - days_passed
 
     visible_txs = [t for t in txs if not getattr(t, 'is_internal_transfer', False) and not getattr(t, 'is_duplicate', False)]
     tracked_income = sum(t.amount for t in visible_txs
@@ -92,18 +91,33 @@ def get_current_budget(db: Session = Depends(get_db), user: User = Depends(get_c
     total_expenses = sum(expense_amount(t, reimb) for t in visible_txs
                          if getattr(t, 'tx_type', 'expense') == 'expense')
 
-    # El sueldo declarado es el piso de ingresos del mes: si lo registrado
-    # (MP/Gmail/manual) no lo alcanza, se asume que el resto entra por canales
-    # no conectados (banco, efectivo). Si lo registrado lo supera, gana lo real.
+    is_variable = bool(getattr(user, 'income_is_variable', False))
     declared_income = user.monthly_income or 0
-    total_income = max(tracked_income, declared_income)
+
+    # Base del presupuesto:
+    #  - Ingreso fijo: el sueldo declarado es el piso; si lo registrado lo supera, gana lo real.
+    #  - Ingreso variable: no hay sueldo fijo, así que la base son los ingresos
+    #    realmente registrados este mes (MP/Gmail/manual).
+    if is_variable:
+        total_income = tracked_income
+        income_base = tracked_income
+    else:
+        total_income = max(tracked_income, declared_income)
+        income_base = total_income
+
+    data = _franja_data(user, txs, month, days_remaining=days_remaining, reimb=reimb, income_base=income_base)
+    data["days_passed"] = days_passed
+    data["days_in_month"] = days_in_month
+    data["days_remaining"] = days_in_month - days_passed
+
     balance = total_income - total_expenses
     pending_count = sum(1 for t in txs if t.needs_review and t.status != "reviewed")
 
     data["total_income"] = total_income
     data["tracked_income"] = tracked_income
     data["declared_income"] = declared_income
-    data["income_is_declared"] = declared_income > tracked_income
+    data["income_is_variable"] = is_variable
+    data["income_is_declared"] = (not is_variable) and declared_income > tracked_income
     data["total_expenses"] = total_expenses
     data["balance"] = balance
     data["pending_count"] = pending_count
@@ -144,6 +158,7 @@ def complete_onboarding(payload: OnboardingPayload, db: Session = Depends(get_db
     user.gustos_pct = payload.gustos_pct
     user.ahorro_pct = payload.ahorro_pct
     user.payday = payload.payday
+    user.income_is_variable = payload.income_is_variable
     user.onboarding_done = True
     db.commit()
     return {"ok": True}
@@ -161,6 +176,8 @@ def update_budget_settings(payload: BudgetUpdatePayload, db: Session = Depends(g
         user.ahorro_pct = payload.ahorro_pct
     if payload.payday is not None:
         user.payday = payload.payday
+    if payload.income_is_variable is not None:
+        user.income_is_variable = payload.income_is_variable
 
     total = user.necesidades_pct + user.gustos_pct + user.ahorro_pct
     if total != 100:
