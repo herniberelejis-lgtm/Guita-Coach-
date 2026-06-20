@@ -315,23 +315,40 @@ nav a svg { width: 18px; height: 18px; flex-shrink: 0; }
 .stat-pill .val { font-size: 1.2rem; font-weight: 700; color: var(--white); }
 .stat-pill .lbl { font-size: .75rem; color: var(--muted); }
 
-/* ── Onboarding ──────────────────────────────────────────────────────────── */
+/* ── Onboarding (página completa, dos columnas como el login) ─────────────── */
 #onboarding-overlay {
   position: fixed; inset: 0;
   background: var(--bg);
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
   z-index: 999;
 }
+.onboarding-info {
+  flex: 1;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 60px;
+  background: var(--bg);
+}
+.onboarding-form-wrap {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center;
+  padding: 48px 60px;
+  overflow-y: auto;
+}
 .onboarding-box {
-  background: var(--navy2);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 20px;
-  padding: 44px;
-  width: 480px;
-  max-width: 95vw;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 440px;
 }
 .onboarding-box h1 { color: var(--white); margin-bottom: 6px; }
 .onboarding-box p  { color: var(--muted); margin-bottom: 28px; font-size: .93rem; }
+@media (max-width: 860px) {
+  .onboarding-info { display: none; }
+  .onboarding-form-wrap { padding: 40px 24px; align-items: flex-start; }
+}
 .pct-row { display: flex; gap: 12px; }
 .pct-row .form-group { flex: 1; }
 .pct-hint { font-size: .78rem; color: var(--muted); margin-top: -10px; margin-bottom: 16px; }

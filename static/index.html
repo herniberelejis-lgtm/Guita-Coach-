@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css?v=4">
+  <link rel="stylesheet" href="/static/css/style.css?v=5">
 </head>
 <body>
 
@@ -107,9 +107,16 @@
 
 <!-- Onboarding overlay (hidden once done) -->
 <div id="onboarding-overlay" style="display:none;">
+  <div class="onboarding-info">
+    <div style="max-width:480px;">
+      <h1 style="font-size:3.2rem;margin-bottom:20px;color:var(--color-accent);">Guita Coach</h1>
+      <p style="font-size:1.2rem;color:var(--color-text-secondary);line-height:1.8;">Tu coach de finanzas personal. Configurá tu presupuesto en un minuto y empezá a tomar el control de tu plata.</p>
+    </div>
+  </div>
+  <div class="onboarding-form-wrap">
   <div class="onboarding-box">
-    <h1>Guita Coach</h1>
-    <p>Tu coach de finanzas personal. Contame un poco de vos para arrancar.</p>
+    <h2 style="margin-bottom:6px;">¡Arranquemos!</h2>
+    <p style="color:var(--muted);margin-bottom:24px;font-size:.93rem;">Contame un poco de vos para personalizar tu presupuesto.</p>
 
     <form id="onboarding-form">
       <div class="form-group">
@@ -158,6 +165,7 @@
         Empezar
       </button>
     </form>
+  </div>
   </div>
 </div>
 
