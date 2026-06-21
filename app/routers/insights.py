@@ -159,7 +159,7 @@ def month_insights(db: Session = Depends(get_db), user: User = Depends(get_curre
     }
 
     dr = max(days_remaining, 1)
-    franjas = {}
+    franjas = []
     for cat, limit in limits.items():
         spent = sum(expense_amount(t, reimb) for t in expense_txs if t.category == cat)
         remaining = max(0, limit - spent)
@@ -172,7 +172,8 @@ def month_insights(db: Session = Depends(get_db), user: User = Depends(get_curre
                 top_merchants[t.merchant] = top_merchants.get(t.merchant, 0) + expense_amount(t, reimb)
         top = sorted(top_merchants.items(), key=lambda x: x[1], reverse=True)[:3]
 
-        franjas[cat] = {
+        franjas.append({
+            "category": cat,
             "spent": spent,
             "limit": limit,
             "remaining": remaining,
@@ -182,7 +183,7 @@ def month_insights(db: Session = Depends(get_db), user: User = Depends(get_curre
             "will_exceed": projection > limit,
             "top_merchants": [{"merchant": m, "amount": a} for m, a in top],
             "daily_allowance": round(remaining / dr, 0),
-        }
+        })
 
     # Días hasta cobro
     payday = user.payday or 1
