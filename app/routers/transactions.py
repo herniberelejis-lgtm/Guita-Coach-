@@ -76,6 +76,36 @@ def list_needs_review(db: Session = Depends(get_db), user: User = Depends(get_cu
     return [_tx_dict(t) for t in txs]
 
 
+@router.post("/reclassify")
+async def reclassify_pending(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Re-clasifica con IA (reglas + Gemini/Claude) los gastos pendientes de
+    categoría. Devuelve cuántos se catalogaron."""
+    from ..services.classifier import classify
+    pending = db.query(Transaction).filter(
+        Transaction.user_id == user.id,
+        Transaction.needs_review == True,
+        Transaction.tx_type == "expense",
+    ).all()
+
+    classified = 0
+    for tx in pending:
+        result = await classify(tx.merchant or "", tx.amount or 0, tx.source or "manual",
+                                db, user_id=user.id)
+        category = result.get("category")
+        if not category:
+            continue
+        tx.category = category
+        tx.subcategory = result.get("subcategory", "") or tx.subcategory
+        tx.confidence = result.get("confidence", 0.8)
+        tx.rule_used = result.get("rule_used")
+        tx.ai_reason = result.get("reason") or result.get("ai_reason")
+        tx.needs_review = result.get("confidence", 0.8) < 0.85
+        if not tx.needs_review:
+            classified += 1
+    db.commit()
+    return {"ok": True, "pending": len(pending), "classified": classified}
+
+
 @router.post("")
 async def add_manual_transaction(payload: ManualTransaction, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     if payload.tx_type == "income":

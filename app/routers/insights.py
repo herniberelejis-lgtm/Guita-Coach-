@@ -119,12 +119,10 @@ def payment_methods_breakdown(month: str = None, db: Session = Depends(get_db),
 
 @router.get("/month")
 def month_insights(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    if not user.monthly_income:
-        return {"error": "Configurá tu ingreso primero"}
-
     now = date.today()
     month = now.strftime("%Y-%m")
-    income = user.monthly_income
+    reimb = reimbursement_map(db, user.id)
+    is_variable = bool(getattr(user, "income_is_variable", False))
 
     days_in_month = (
         (date(now.year, now.month % 12 + 1, 1) - date(now.year, now.month, 1)).days
@@ -140,8 +138,19 @@ def month_insights(db: Session = Depends(get_db), user: User = Depends(get_curre
         Transaction.status.in_(["confirmed", "classified"]),
     ).all()
 
-    expense_txs = [t for t in txs if getattr(t, 'tx_type', 'expense') == 'expense'
-                   and not getattr(t, 'is_internal_transfer', False) and not getattr(t, 'is_duplicate', False)]
+    visible = [t for t in txs if not getattr(t, 'is_internal_transfer', False)
+               and not getattr(t, 'is_duplicate', False)]
+    expense_txs = [t for t in visible if getattr(t, 'tx_type', 'expense') == 'expense']
+
+    # Ingreso base: mismo criterio que el presupuesto (sueldo fijo vs variable)
+    tracked_income = sum(t.amount for t in visible
+                         if getattr(t, 'tx_type', 'expense') == 'income'
+                         and not getattr(t, 'is_reimbursement', False))
+    declared_income = user.monthly_income or 0
+    income = tracked_income if is_variable else max(tracked_income, declared_income)
+
+    if income <= 0 and not expense_txs:
+        return {"error": "Configurá tu ingreso primero"}
 
     limits = {
         "necesidades": income * user.necesidades_pct / 100,
@@ -152,7 +161,7 @@ def month_insights(db: Session = Depends(get_db), user: User = Depends(get_curre
     dr = max(days_remaining, 1)
     franjas = {}
     for cat, limit in limits.items():
-        spent = sum(t.amount for t in expense_txs if t.category == cat)
+        spent = sum(expense_amount(t, reimb) for t in expense_txs if t.category == cat)
         remaining = max(0, limit - spent)
         daily_rate = spent / days_passed if days_passed > 0 else 0
         projection = spent + daily_rate * days_remaining
@@ -160,7 +169,7 @@ def month_insights(db: Session = Depends(get_db), user: User = Depends(get_curre
         top_merchants = {}
         for t in expense_txs:
             if t.category == cat:
-                top_merchants[t.merchant] = top_merchants.get(t.merchant, 0) + t.amount
+                top_merchants[t.merchant] = top_merchants.get(t.merchant, 0) + expense_amount(t, reimb)
         top = sorted(top_merchants.items(), key=lambda x: x[1], reverse=True)[:3]
 
         franjas[cat] = {
@@ -184,7 +193,7 @@ def month_insights(db: Session = Depends(get_db), user: User = Depends(get_curre
         payday_next = date(next_month.year, next_month.month, payday)
         days_to_payday = (payday_next - now).days
 
-    total_spent = sum(t.amount for t in expense_txs)
+    total_spent = sum(expense_amount(t, reimb) for t in expense_txs)
     total_budget = income
 
     # Frequent merchants (top 5 by count, expense only) — one pass for totals
@@ -193,7 +202,7 @@ def month_insights(db: Session = Depends(get_db), user: User = Depends(get_curre
     for t in expense_txs:
         if t.merchant:
             merchant_counts[t.merchant] += 1
-            merchant_totals[t.merchant] = merchant_totals.get(t.merchant, 0) + t.amount
+            merchant_totals[t.merchant] = merchant_totals.get(t.merchant, 0) + expense_amount(t, reimb)
     frequent_merchants = [
         {"merchant": m, "count": c, "total": merchant_totals[m]}
         for m, c in merchant_counts.most_common(5)

@@ -160,13 +160,35 @@ const Transactions = {
       left.appendChild(countBadge);
       left.appendChild(document.createTextNode('transacciones sin categoría'));
 
+      const btns = document.createElement('div');
+      btns.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
+
+      const aiBtn = document.createElement('button');
+      aiBtn.className = 'btn btn-primary btn-sm';
+      aiBtn.textContent = '✨ Categorizar con IA';
+      aiBtn.onclick = async function() {
+        aiBtn.disabled = true;
+        aiBtn.textContent = 'Catalogando…';
+        try {
+          const r = await API.reclassifyPending();
+          App.toast(`IA catalogó ${r.classified} de ${r.pending} pendientes`, 'success');
+          Transactions.render();
+        } catch (err) {
+          App.toast(err.message, 'error');
+          aiBtn.disabled = false;
+          aiBtn.textContent = '✨ Categorizar con IA';
+        }
+      };
+
       const reviewBtn = document.createElement('button');
-      reviewBtn.className = 'btn btn-primary btn-sm';
-      reviewBtn.textContent = 'Categorizar';
+      reviewBtn.className = 'btn btn-ghost btn-sm';
+      reviewBtn.textContent = 'Manual';
       reviewBtn.onclick = function() { Transactions.showReviewModal(items); };
 
+      btns.appendChild(aiBtn);
+      btns.appendChild(reviewBtn);
       notice.appendChild(left);
-      notice.appendChild(reviewBtn);
+      notice.appendChild(btns);
       wrap.appendChild(notice);
     } catch (_) { /* ignore */ }
   },

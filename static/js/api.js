@@ -33,6 +33,7 @@ const API = {
     return API.get('/transactions' + (q ? '?' + q : ''));
   },
   getNeedsReview:    () => API.get('/transactions/needs-review'),
+  reclassifyPending: () => API.post('/transactions/reclassify'),
   getPaymentMethods: (month) => API.get('/insights/payment-methods' + (month ? '?month=' + month : '')),
   addTransaction:    (d) => API.post('/transactions', d),
   correctCategory:   (id, d) => API.patch(`/transactions/${id}/category`, d),
