@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     app_url: str = "http://localhost:8000"
     port: int = 8000
     demo_mode: bool = True
+    live_prices: bool = True  # obtener precios de mercado en tiempo real (Yahoo/CoinGecko)
 
     @property
     def claude_enabled(self) -> bool:

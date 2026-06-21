@@ -192,6 +192,42 @@ async def _maybe_blue() -> Optional[float]:
     return await price_svc.fetch_blue_rate()
 
 
+async def _sync_prices(db: Session, investments: list[Investment], force: bool = False) -> int:
+    """Trae precios en tiempo real (Yahoo/CoinGecko, con cache) para las posiciones
+    dadas y los persiste en InvestmentPrice. Devuelve cuántos se actualizaron.
+    Nunca rompe la carga: ante error de red simplemente no actualiza."""
+    from ..config import get_settings
+    if not get_settings().live_prices:
+        return 0
+    specs = [
+        {"ticker": inv.ticker, "asset_type": inv.asset_type or "stock",
+         "currency": inv.currency or "ARS"}
+        for inv in investments if inv.quantity and inv.quantity > 0
+    ]
+    if not specs:
+        return 0
+    try:
+        quotes = await price_svc.fetch_prices(specs, force=force)
+    except Exception:
+        return 0
+
+    updated = 0
+    for inv in investments:
+        q = quotes.get(price_svc.normalize_ticker(inv.ticker))
+        if not q:
+            continue
+        rec = db.query(InvestmentPrice).filter(InvestmentPrice.ticker == inv.ticker).first()
+        if rec:
+            rec.price, rec.currency, rec.asset_type = q["price"], q["currency"], (inv.asset_type or "stock")
+        else:
+            db.add(InvestmentPrice(ticker=inv.ticker, price=q["price"],
+                                   currency=q["currency"], asset_type=inv.asset_type or "stock"))
+        updated += 1
+    if updated:
+        db.commit()
+    return updated
+
+
 # ─── Endpoints ────────────────────────────────────────────────────────────
 @router.post("/upload", response_model=UploadResponse)
 async def upload_csv(
@@ -266,29 +302,13 @@ async def refresh_prices(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> RefreshResponse:
-    """Actualiza los precios de las posiciones cripto vía CoinGecko (USD)."""
-    crypto_tickers = [
-        inv.ticker for inv in db.query(Investment).filter(
-            and_(Investment.user_id == user.id, Investment.status == "open",
-                 Investment.asset_type == "crypto")
-        ).all()
-    ]
-    if not crypto_tickers:
-        blue = await _maybe_blue()
-        return RefreshResponse(ok=True, updated=0, blue_rate=blue)
-
-    usd_prices = await price_svc.fetch_crypto_prices_usd(crypto_tickers)
+    """Fuerza la actualización en tiempo real de TODOS los activos (acciones AR,
+    CEDEARs, US y cripto) vía Yahoo Finance (CoinGecko de fallback)."""
+    investments = db.query(Investment).filter(
+        and_(Investment.user_id == user.id, Investment.status == "open")
+    ).all()
+    updated = await _sync_prices(db, investments, force=True)
     blue = await _maybe_blue()
-
-    updated = 0
-    for ticker, usd in usd_prices.items():
-        rec = db.query(InvestmentPrice).filter(InvestmentPrice.ticker == ticker).first()
-        if rec:
-            rec.price, rec.currency, rec.asset_type = usd, "USD", "crypto"
-        else:
-            db.add(InvestmentPrice(ticker=ticker, price=usd, currency="USD", asset_type="crypto"))
-        updated += 1
-    db.commit()
     return RefreshResponse(ok=True, updated=updated, blue_rate=blue)
 
 
@@ -309,6 +329,7 @@ async def get_holdings(
     if not investments:
         return []
 
+    await _sync_prices(db, investments)  # precios en tiempo real (cacheados)
     prices = _price_map(db, user.id)
     needs_blue = any((inv.currency or "ARS") == "ARS" and prices.get(inv.ticker)
                      and (prices[inv.ticker].currency or "ARS") == "USD" for inv in investments)
@@ -362,6 +383,7 @@ async def get_summary(
         InvestmentTransaction.user_id == user.id
     ).all()
 
+    await _sync_prices(db, [i for i in all_invs if i.status == "open"])  # tiempo real (cacheado)
     prices = _price_map(db, user.id)
     needs_blue = (
         any((t.currency or "ARS") == "USD" for t in all_txs)

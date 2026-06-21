@@ -61,6 +61,23 @@ class TestAssetTypeInference:
         assert ids == {"BTC": "bitcoin", "ETH": "ethereum"}
 
 
+class TestYahooSymbol:
+    def test_crypto_symbol(self):
+        assert price_svc.yahoo_symbol("BTC", "crypto", "USD") == "BTC-USD"
+
+    def test_ar_stock_symbol(self):
+        assert price_svc.yahoo_symbol("GGAL", "stock", "ARS") == "GGAL.BA"
+
+    def test_cedear_symbol(self):
+        assert price_svc.yahoo_symbol("AAPL", "stock", "ARS") == "AAPL.BA"
+
+    def test_us_stock_symbol(self):
+        assert price_svc.yahoo_symbol("AAPL", "stock", "USD") == "AAPL"
+
+    def test_lowercase_ticker_normalized(self):
+        assert price_svc.yahoo_symbol("ggal", "stock", "ARS") == "GGAL.BA"
+
+
 class TestRealizedPnl:
     def test_replay_realized_pnl(self):
         from app.routers.investments import _realized_pnl
