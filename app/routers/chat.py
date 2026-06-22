@@ -29,6 +29,43 @@ def _month_list(n: int = 6) -> list[str]:
     return months
 
 
+def _load_investment_context(db: Session, user: User) -> dict | None:
+    """Resumen liviano de la cartera para el contexto del chat: usa precios ya
+    cacheados en InvestmentPrice (sin red) para no agregar latencia al chat."""
+    from ..models import Investment, InvestmentPrice
+    from ..services.investment_calculator import calculate_concentration_flags
+
+    invs = db.query(Investment).filter(
+        Investment.user_id == user.id, Investment.status == "open", Investment.quantity > 0,
+    ).all()
+    if not invs:
+        return None
+
+    price_map = {r.ticker: r for r in db.query(InvestmentPrice).all()}
+    holdings = []
+    total_invested = total_current = 0.0
+    for inv in invs:
+        price_rec = price_map.get(inv.ticker)
+        price = price_rec.price if price_rec else inv.avg_cost
+        cost = inv.quantity * inv.avg_cost
+        value = inv.quantity * price
+        total_invested += cost
+        total_current += value
+        holdings.append({
+            "ticker": inv.ticker,
+            "asset_type": inv.asset_type or "stock",
+            "current_value": value,
+            "pnl_pct": ((value - cost) / cost * 100) if cost else 0.0,
+        })
+
+    return {
+        "total_invested": total_invested,
+        "total_current_value": total_current,
+        "holdings": holdings,
+        "concentration_flags": calculate_concentration_flags(holdings),
+    }
+
+
 def _load_financial_context(db: Session, user: User) -> dict:
     from datetime import date
     month = date.today().strftime("%Y-%m")
@@ -101,6 +138,7 @@ def _load_financial_context(db: Session, user: User) -> dict:
         "goals": [(g.name, g.saved_amount, g.target_amount, g.is_done) for g in goals],
         "recurring_committed": committed,
         "pending_review": sum(1 for t in txs if t.needs_review),
+        "investments": _load_investment_context(db, user),
     }
 
 
@@ -135,6 +173,19 @@ def _format_context(ctx: dict) -> str:
             f"  {n}: ${s:,.0f} de ${t:,.0f}" + (" (cumplida)" if d else "")
             for n, s, t, d in ctx["goals"]
         ]
+    if ctx.get("investments"):
+        inv = ctx["investments"]
+        lines.append("Cartera de inversiones:")
+        lines.append(
+            f"  Invertido: ${inv['total_invested']:,.0f} | Valor actual: ${inv['total_current_value']:,.0f}"
+        )
+        lines += [
+            f"  {h['ticker']} ({h['asset_type']}): valor ${h['current_value']:,.0f}, P&L {h['pnl_pct']:+.1f}%"
+            for h in inv["holdings"][:8]
+        ]
+        if inv["concentration_flags"]:
+            flags_str = ", ".join(f"{f['ticker']} {f['pct']:.0f}%" for f in inv["concentration_flags"])
+            lines.append(f"  Concentracion de riesgo: {flags_str} (recomendado: maximo 30% en un solo instrumento)")
     return "\n".join(lines)
 
 

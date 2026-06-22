@@ -41,6 +41,9 @@ const Investments = {
     const summaryWrap = document.createElement('div');
     page.appendChild(summaryWrap);
 
+    const riskWrap = document.createElement('div');
+    page.appendChild(riskWrap);
+
     const chartsWrap = document.createElement('div');
     page.appendChild(chartsWrap);
 
@@ -60,6 +63,7 @@ const Investments = {
     ]);
 
     this._renderSummary(summaryWrap, summary);
+    this._renderRisk(riskWrap, summary);
     this._renderCharts(chartsWrap, holdings, summary);
     this._renderHoldings(holdingsBlock.body, holdings);
     this._renderHistory(historyBlock.body, history);
@@ -128,6 +132,42 @@ const Investments = {
         Number(s.blue_rate).toLocaleString('es-AR') + '). Acciones AR usan el último precio cargado.';
       wrap.appendChild(hint);
     }
+  },
+
+  _renderRisk(wrap, s) {
+    wrap.textContent = '';
+    if (!s) return;
+    const items = [];
+    (s.risk_flags || []).forEach(f => {
+      items.push({
+        cls: 'warning',
+        text: `${f.ticker} representa ${f.pct.toFixed(0)}% de tu cartera — por encima del 30% recomendado para un solo instrumento.`,
+      });
+    });
+    if (s.benchmark) {
+      const b = s.benchmark;
+      const better = b.portfolio_return_pct >= b.benchmark_return_pct;
+      const fmtPct = v => (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+      items.push({
+        cls: better ? 'info' : 'warning',
+        text: `Tu cartera rindió ${fmtPct(b.portfolio_return_pct)} desde ${b.since}, vs ${fmtPct(b.benchmark_return_pct)} del ${b.name} en el mismo período.`,
+      });
+    }
+    if (!items.length) return;
+
+    items.forEach(it => {
+      const div = document.createElement('div');
+      div.className = 'alert-item ' + it.cls;
+      const icon = document.createElement('span');
+      icon.className = 'alert-icon';
+      icon.textContent = it.cls === 'warning' ? '⚠️' : 'ℹ️';
+      const msg = document.createElement('span');
+      msg.className = 'alert-msg';
+      msg.textContent = it.text;
+      div.appendChild(icon);
+      div.appendChild(msg);
+      wrap.appendChild(div);
+    });
   },
 
   _renderCharts(wrap, holdings, summary) {

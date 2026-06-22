@@ -470,6 +470,80 @@ class TestGetSummary:
         response = client.get("/api/investments/summary")
         assert response.status_code == 401
 
+    def test_get_summary_concentration_flag(self, authenticated_client):
+        """A position dominating the portfolio is flagged as a risk."""
+        TestingSession = _get_testing_session(authenticated_client)
+        db = TestingSession()
+        db.add(Investment(
+            user_id=1, broker="cocos_capital", ticker="GGAL", asset_type="stock",
+            quantity=10.0, avg_cost=150.0, purchase_date=date(2024, 1, 15), status="open",
+        ))
+        db.add(Investment(
+            user_id=1, broker="cocos_capital", ticker="AL30", asset_type="stock",
+            quantity=1.0, avg_cost=10.0, purchase_date=date(2024, 1, 15), status="open",
+        ))
+        db.add(InvestmentPrice(ticker="GGAL", price=150.0, currency="ARS"))
+        db.add(InvestmentPrice(ticker="AL30", price=10.0, currency="ARS"))
+        db.commit()
+        db.close()
+
+        response = authenticated_client.get("/api/investments/summary")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["risk_flags"]) == 1
+        assert data["risk_flags"][0]["ticker"] == "GGAL"
+        assert data["risk_flags"][0]["pct"] > 30.0
+
+    def test_get_summary_no_benchmark_without_transactions(self, authenticated_client):
+        """No benchmark comparison when there's no transaction history to date from."""
+        TestingSession = _get_testing_session(authenticated_client)
+        db = TestingSession()
+        db.add(Investment(
+            user_id=1, broker="cocos_capital", ticker="GGAL", asset_type="stock",
+            quantity=10.0, avg_cost=150.0, purchase_date=date(2024, 1, 15), status="open",
+        ))
+        db.add(InvestmentPrice(ticker="GGAL", price=160.0, currency="ARS"))
+        db.commit()
+        db.close()
+
+        response = authenticated_client.get("/api/investments/summary")
+        assert response.json()["benchmark"] is None
+
+    def test_get_summary_benchmark_comparison(self, authenticated_client, monkeypatch):
+        """Benchmark comparison appears when there's a stock position with tx history."""
+        async def fake_benchmark_return(symbol, since_date):
+            assert symbol == "^MERV"
+            return 15.0
+
+        from app.services import prices as price_svc
+        monkeypatch.setattr(price_svc, "fetch_benchmark_return_pct", fake_benchmark_return)
+
+        TestingSession = _get_testing_session(authenticated_client)
+        db = TestingSession()
+        inv = Investment(
+            user_id=1, broker="cocos_capital", ticker="GGAL", asset_type="stock",
+            quantity=10.0, avg_cost=150.0, purchase_date=date(2024, 1, 15), status="open",
+        )
+        db.add(inv)
+        db.flush()
+        db.add(InvestmentTransaction(
+            investment_id=inv.id, user_id=1, broker="cocos_capital", ticker="GGAL",
+            tx_type="buy", quantity=10.0, price=150.0, date=date(2024, 1, 15),
+        ))
+        db.add(InvestmentPrice(ticker="GGAL", price=180.0, currency="ARS"))
+        db.commit()
+        db.close()
+
+        response = authenticated_client.get("/api/investments/summary")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["benchmark"] is not None
+        assert data["benchmark"]["name"] == "MERVAL"
+        assert data["benchmark"]["benchmark_return_pct"] == 15.0
+        assert abs(data["benchmark"]["portfolio_return_pct"] - 20.0) < 0.01  # (1800-1500)/1500*100
+
 
 # TestUpdatePrice class removed
 # POST /api/investments/price endpoint disabled for MVP due to cross-tenant security concerns

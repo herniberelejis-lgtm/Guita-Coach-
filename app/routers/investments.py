@@ -16,7 +16,7 @@ from ..database import get_db
 from ..models import User, Investment, InvestmentTransaction, InvestmentPrice
 from ..security import get_current_user
 from ..services.investment_parser import parse_file
-from ..services.investment_calculator import calculate_weighted_avg_cost
+from ..services.investment_calculator import calculate_weighted_avg_cost, calculate_concentration_flags
 from ..services import prices as price_svc
 
 router = APIRouter(prefix="/api/investments", tags=["investments"])
@@ -60,6 +60,8 @@ class SummaryResponse(BaseModel):
     currency: str
     blue_rate: Optional[float] = None
     by_type: dict = {}
+    risk_flags: list[dict] = []
+    benchmark: Optional[dict] = None
 
 
 class UploadResponse(BaseModel):
@@ -396,6 +398,8 @@ async def get_summary(
     total_buys = total_sells = 0.0
     holdings_count = 0
     by_type: dict = {}
+    holding_values: list[dict] = []
+    has_stock = False
 
     # Compras / ventas / realizado (sobre todas las transacciones)
     txs_by_inv: dict = {}
@@ -420,18 +424,40 @@ async def get_summary(
                                       {"invested": 0.0, "current_value": 0.0})
             slot["invested"] += cost_ars
             slot["current_value"] += value_ars
+            holding_values.append({"ticker": inv.ticker, "current_value": value_ars})
+            if (inv.asset_type or "stock") == "stock":
+                has_stock = True
 
     total_unrealized = total_current_value - total_invested
+    total_pnl = total_unrealized + realized
+    risk_flags = calculate_concentration_flags(holding_values)
+
+    benchmark = None
+    earliest_tx_date = min((t.date for t in all_txs), default=None)
+    if earliest_tx_date and has_stock and total_invested > 0:
+        bench_return = await price_svc.fetch_benchmark_return_pct(
+            price_svc.BENCHMARK_SYMBOLS["merval"], earliest_tx_date,
+        )
+        if bench_return is not None:
+            benchmark = {
+                "name": "MERVAL",
+                "portfolio_return_pct": (total_pnl / total_invested) * 100,
+                "benchmark_return_pct": bench_return,
+                "since": str(earliest_tx_date),
+            }
+
     return SummaryResponse(
         total_invested=total_invested,
         total_current_value=total_current_value,
         total_unrealized=total_unrealized,
         realized_pnl=realized,
-        total_pnl=total_unrealized + realized,
+        total_pnl=total_pnl,
         total_buys=total_buys,
         total_sells=total_sells,
         holdings_count=holdings_count,
         currency="ARS",
         blue_rate=blue,
         by_type=by_type,
+        risk_flags=risk_flags,
+        benchmark=benchmark,
     )

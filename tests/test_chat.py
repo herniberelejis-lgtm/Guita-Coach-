@@ -4,7 +4,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-from app.models import Base, Transaction, User
+from datetime import date
+from app.models import Base, Transaction, User, Investment, InvestmentPrice
 from app.main import app
 from app.database import get_db
 from app.security import get_current_user
@@ -77,3 +78,35 @@ def test_chat_starters_returns_list(client_chat):
     assert "starters" in data
     assert len(data["starters"]) >= 3
     assert all(isinstance(s, str) for s in data["starters"])
+
+
+def test_load_investment_context_none_without_holdings(client_chat):
+    from app.routers.chat import _load_investment_context
+    import app.database as db_mod
+    db = db_mod.SessionLocal()
+    user = db.query(User).first()
+    assert _load_investment_context(db, user) is None
+    db.close()
+
+
+def test_load_investment_context_with_holdings(client_chat):
+    import app.database as db_mod
+    db = db_mod.SessionLocal()
+    db.add(Investment(
+        user_id=1, broker="cocos_capital", ticker="GGAL", asset_type="stock",
+        quantity=10.0, avg_cost=150.0, purchase_date=date(2024, 1, 15), status="open",
+    ))
+    db.add(InvestmentPrice(ticker="GGAL", price=180.0, currency="ARS"))
+    db.commit()
+    db.close()
+
+    from app.routers.chat import _load_investment_context
+    db = db_mod.SessionLocal()
+    user = db.query(User).first()
+    ctx = _load_investment_context(db, user)
+    db.close()
+
+    assert ctx is not None
+    assert ctx["total_invested"] == 1500.0
+    assert ctx["total_current_value"] == 1800.0
+    assert ctx["holdings"][0]["ticker"] == "GGAL"

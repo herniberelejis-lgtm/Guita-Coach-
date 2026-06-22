@@ -132,6 +132,34 @@ def calculate_pnl_realized(
     return (sell_price - avg_cost) * quantity_sold
 
 
+def calculate_concentration_flags(
+    holdings: List[dict],
+    threshold_pct: float = 30.0,
+) -> List[dict]:
+    """
+    Flags holdings that exceed a concentration threshold of total portfolio value.
+
+    Args:
+        holdings: list of dicts with keys: ticker, current_value
+        threshold_pct: max recommended % in a single instrument (default 30%,
+            matching the advisor's own diversification rule)
+
+    Returns:
+        List of {"ticker": str, "pct": float} for tickers over threshold,
+        sorted by pct descending. Empty list if portfolio has no value.
+    """
+    total = sum(h.get("current_value", 0.0) for h in holdings)
+    if total <= 0:
+        return []
+    flags = [
+        {"ticker": h.get("ticker", ""), "pct": (h.get("current_value", 0.0) / total) * 100}
+        for h in holdings
+        if (h.get("current_value", 0.0) / total) * 100 > threshold_pct
+    ]
+    flags.sort(key=lambda f: f["pct"], reverse=True)
+    return flags
+
+
 def calculate_portfolio_summary(
     holdings: List[Holding],
     realized_pnl_total: float = 0.0,

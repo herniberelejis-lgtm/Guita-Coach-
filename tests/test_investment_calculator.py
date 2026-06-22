@@ -13,6 +13,7 @@ from app.services.investment_calculator import (
     calculate_pnl_unrealized,
     calculate_pnl_realized,
     calculate_portfolio_summary,
+    calculate_concentration_flags,
 )
 
 
@@ -549,6 +550,64 @@ class TestPortfolioSummary:
         assert result["total_unrealized"] == 0.0
         assert result["realized_pnl"] == 5000.0
         assert result["total_pnl"] == 5000.0
+
+
+class TestConcentrationFlags:
+    """Test single-instrument concentration risk flags."""
+
+    def test_empty_portfolio_no_flags(self):
+        assert calculate_concentration_flags([]) == []
+
+    def test_balanced_portfolio_no_flags(self):
+        holdings = [
+            {"ticker": "GGAL", "current_value": 1000.0},
+            {"ticker": "AL30", "current_value": 1000.0},
+            {"ticker": "BTC", "current_value": 1000.0},
+            {"ticker": "ETH", "current_value": 1000.0},
+        ]
+        assert calculate_concentration_flags(holdings) == []
+
+    def test_single_holding_over_threshold(self):
+        holdings = [
+            {"ticker": "GGAL", "current_value": 4000.0},
+            {"ticker": "AL30", "current_value": 1000.0},
+        ]
+        flags = calculate_concentration_flags(holdings)
+        assert len(flags) == 1
+        assert flags[0]["ticker"] == "GGAL"
+        assert abs(flags[0]["pct"] - 80.0) < 0.01
+
+    def test_exactly_at_threshold_not_flagged(self):
+        holdings = [
+            {"ticker": "GGAL", "current_value": 30.0},
+            {"ticker": "AL30", "current_value": 30.0},
+            {"ticker": "BTC", "current_value": 40.0},
+        ]
+        flags = calculate_concentration_flags(holdings)
+        assert [f["ticker"] for f in flags] == ["BTC"]
+
+    def test_multiple_flags_sorted_descending(self):
+        holdings = [
+            {"ticker": "A", "current_value": 50.0},
+            {"ticker": "B", "current_value": 40.0},
+            {"ticker": "C", "current_value": 10.0},
+        ]
+        flags = calculate_concentration_flags(holdings)
+        assert [f["ticker"] for f in flags] == ["A", "B"]
+        assert flags[0]["pct"] > flags[1]["pct"]
+
+    def test_custom_threshold(self):
+        holdings = [
+            {"ticker": "A", "current_value": 60.0},
+            {"ticker": "B", "current_value": 40.0},
+        ]
+        assert calculate_concentration_flags(holdings, threshold_pct=70.0) == []
+        flags = calculate_concentration_flags(holdings, threshold_pct=50.0)
+        assert [f["ticker"] for f in flags] == ["A"]
+
+    def test_zero_total_value_no_flags(self):
+        holdings = [{"ticker": "A", "current_value": 0.0}]
+        assert calculate_concentration_flags(holdings) == []
 
 
 class TestEdgeCasesAndValidation:

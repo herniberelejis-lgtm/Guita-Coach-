@@ -175,6 +175,41 @@ async def fetch_prices(specs: list[dict], force: bool = False) -> dict[str, dict
     return result
 
 
+BENCHMARK_SYMBOLS = {"merval": "^MERV", "sp500": "SPY"}
+
+
+async def fetch_benchmark_return_pct(symbol: str, since_date) -> Optional[float]:
+    """Retorno % de un benchmark (indice/ETF) entre `since_date` y hoy, via Yahoo
+    Finance. None si no se pudo calcular (sin red, simbolo invalido, etc.) —
+    nunca rompe el caller."""
+    import datetime as _dt
+    if isinstance(since_date, str):
+        since_date = _dt.date.fromisoformat(since_date)
+    period1 = int(_dt.datetime.combine(since_date, _dt.time()).timestamp())
+    period2 = int(_dt.datetime.combine(since_date + _dt.timedelta(days=9), _dt.time()).timestamp())
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(
+                YAHOO_URL.format(symbol=symbol),
+                headers=_YAHOO_HEADERS,
+                params={"period1": period1, "period2": period2, "interval": "1d"},
+            )
+            r.raise_for_status()
+            closes = r.json()["chart"]["result"][0]["indicators"]["quote"][0]["close"]
+            start_price = next((c for c in closes if c is not None), None)
+            if not start_price:
+                return None
+
+            r2 = await client.get(YAHOO_URL.format(symbol=symbol), headers=_YAHOO_HEADERS)
+            r2.raise_for_status()
+            current_price = r2.json()["chart"]["result"][0]["meta"].get("regularMarketPrice")
+            if not current_price:
+                return None
+    except Exception:
+        return None
+    return (current_price - start_price) / start_price * 100
+
+
 async def fetch_blue_rate() -> Optional[float]:
     """Dólar blue (venta) para convertir USD→ARS. None ante error."""
     try:
