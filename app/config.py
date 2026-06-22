@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     port: int = 8000
     demo_mode: bool = True
     live_prices: bool = True  # obtener precios de mercado en tiempo real (Yahoo/CoinGecko)
+    database_url: str = ""  # postgres en prod (Railway inyecta DATABASE_URL); vacío = sqlite local
 
     @property
     def claude_enabled(self) -> bool:

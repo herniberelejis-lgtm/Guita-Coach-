@@ -1,25 +1,39 @@
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from .models import Base
+from .config import get_settings
 
-DATABASE_URL = "sqlite:///./guita.db"
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+def _resolve_database_url() -> str:
+    url = get_settings().database_url or "sqlite:///./guita.db"
+    # Railway/Heroku exponen postgres:// pero SQLAlchemy 2.x requiere postgresql://
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+    return url
+
+
+DATABASE_URL = _resolve_database_url()
+IS_SQLITE = DATABASE_URL.startswith("sqlite")
+
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False} if IS_SQLITE else {},
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def _run_migrations():
-    """Applies additive SQLite migrations safely (idempotent)."""
+    """Applies additive migrations safely (idempotent, SQLite + Postgres)."""
     migrations = [
         "ALTER TABLE transactions ADD COLUMN tx_type VARCHAR DEFAULT 'expense'",
-        "ALTER TABLE transactions ADD COLUMN is_internal_transfer BOOLEAN DEFAULT 0",
-        "ALTER TABLE transactions ADD COLUMN is_duplicate BOOLEAN DEFAULT 0",
+        "ALTER TABLE transactions ADD COLUMN is_internal_transfer BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE transactions ADD COLUMN is_duplicate BOOLEAN DEFAULT FALSE",
         "ALTER TABLE users ADD COLUMN email VARCHAR",
         "ALTER TABLE users ADD COLUMN password_hash VARCHAR",
-        "ALTER TABLE transactions ADD COLUMN is_reimbursement BOOLEAN DEFAULT 0",
+        "ALTER TABLE transactions ADD COLUMN is_reimbursement BOOLEAN DEFAULT FALSE",
         "ALTER TABLE transactions ADD COLUMN reimburses_tx_id INTEGER",
         "ALTER TABLE alerts ADD COLUMN payload TEXT",
         "ALTER TABLE transactions ADD COLUMN payment_method VARCHAR DEFAULT ''",
-        "ALTER TABLE users ADD COLUMN income_is_variable BOOLEAN DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN income_is_variable BOOLEAN DEFAULT FALSE",
         "ALTER TABLE investment ADD COLUMN asset_type VARCHAR DEFAULT 'stock'",
         "ALTER TABLE investment ADD COLUMN currency VARCHAR DEFAULT 'ARS'",
         "ALTER TABLE investment_transaction ADD COLUMN asset_type VARCHAR DEFAULT 'stock'",
@@ -35,6 +49,7 @@ def _run_migrations():
                 msg = str(e).lower()
                 if "duplicate column" not in msg and "already exists" not in msg:
                     raise
+                conn.rollback()
 
 def init_db():
     Base.metadata.create_all(bind=engine)
