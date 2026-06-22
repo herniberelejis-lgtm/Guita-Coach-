@@ -103,12 +103,18 @@ const App = {
     document.querySelectorAll('nav a[data-page]').forEach(a => {
       a.classList.toggle('active', a.dataset.page === page);
     });
+    const moreBtn = document.getElementById('more-nav-btn');
+    if (moreBtn) {
+      const overflowPages = ['goals', 'chat', 'academy', 'settings'];
+      moreBtn.classList.toggle('active', overflowPages.includes(page));
+    }
   },
 
   _bindNav() {
     document.querySelectorAll('nav a[data-page]').forEach(a => {
       a.addEventListener('click', e => {
         e.preventDefault();
+        this._closeMoreSheet();
         location.hash = a.dataset.page;
       });
     });
@@ -119,6 +125,26 @@ const App = {
       ham.addEventListener('click', () => sidebar.classList.toggle('open'));
       document.getElementById('main').addEventListener('click', () => sidebar.classList.remove('open'));
     }
+
+    const moreBtn = document.getElementById('more-nav-btn');
+    const backdrop = document.getElementById('more-backdrop');
+    if (moreBtn) {
+      moreBtn.addEventListener('click', () => this._toggleMoreSheet());
+      backdrop.addEventListener('click', () => this._closeMoreSheet());
+    }
+  },
+
+  _toggleMoreSheet() {
+    const sheet = document.getElementById('more-sheet');
+    const backdrop = document.getElementById('more-backdrop');
+    const isOpen = sheet.style.display === 'block';
+    sheet.style.display = isOpen ? 'none' : 'block';
+    backdrop.style.display = isOpen ? 'none' : 'block';
+  },
+
+  _closeMoreSheet() {
+    document.getElementById('more-sheet').style.display = 'none';
+    document.getElementById('more-backdrop').style.display = 'none';
   },
 
   navigate(page) {
