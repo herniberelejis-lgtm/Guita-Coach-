@@ -4,6 +4,7 @@ const Investments = {
     cocos_capital: 'Cocos Capital',
     invertir_online: 'Invertir Online',
     bull_market: 'Bull Market',
+    ppi: 'Portfolio Personal (PPI)',
     manual: 'Manual',
   },
 
@@ -473,7 +474,7 @@ const Investments = {
     const uploadWrap = document.createElement('div');
     const ut = document.createElement('p');
     ut.style.cssText = 'font-size:.8rem;color:var(--muted);margin-bottom:12px;';
-    ut.textContent = 'Subir CSV del broker (Cocos, IOL, Bull Market)';
+    ut.textContent = 'Subir CSV/XLSX del broker (Cocos, IOL, Bull Market, PPI)';
     uploadWrap.appendChild(ut);
     uploadWrap.appendChild(this._buildUploadZone());
     grid.appendChild(uploadWrap);

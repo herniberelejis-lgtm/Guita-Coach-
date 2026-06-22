@@ -55,6 +55,20 @@ const Academy = {
       });
       main.appendChild(grid);
     });
+
+    if (data.glossary && data.glossary.length > 0) {
+      const t = document.createElement('p');
+      t.className = 'section-title';
+      t.textContent = 'Glosario financiero';
+      main.appendChild(t);
+
+      const list = document.createElement('div');
+      list.style.cssText = 'display:flex;flex-direction:column;gap:10px;margin-bottom:28px;';
+      data.glossary.forEach(function(term) {
+        list.appendChild(Academy._glossaryCard(term));
+      });
+      main.appendChild(list);
+    }
   },
 
   _topicCard(topic, highlighted) {
@@ -79,6 +93,53 @@ const Academy = {
 
     card.addEventListener('click', function() {
       body.style.display = body.style.display === 'none' ? 'block' : 'none';
+    });
+
+    return card;
+  },
+
+  _glossaryCard(term) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.cssText = 'cursor:pointer;';
+
+    const name = document.createElement('div');
+    name.style.cssText = 'font-weight:600;display:flex;justify-content:space-between;align-items:center;';
+    const nameText = document.createElement('span');
+    nameText.textContent = term.term;
+    const chevron = document.createElement('span');
+    chevron.style.cssText = 'color:var(--muted);font-size:.8rem;transition:transform .15s;';
+    chevron.textContent = '▾';
+    name.appendChild(nameText);
+    name.appendChild(chevron);
+    card.appendChild(name);
+
+    const body = document.createElement('div');
+    body.style.cssText = 'display:none;font-size:.88rem;line-height:1.6;color:var(--white);margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08);';
+
+    const fields = [
+      ['Definición formal', term.definition_formal],
+      ['En criollo', term.definition_simple],
+      ['Ejemplo práctico', term.example],
+    ];
+    fields.forEach(function(pair) {
+      const row = document.createElement('div');
+      row.style.cssText = 'margin-bottom:10px;';
+      const label = document.createElement('div');
+      label.style.cssText = 'font-weight:600;color:var(--gold);font-size:.78rem;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px;';
+      label.textContent = pair[0];
+      const value = document.createElement('div');
+      value.textContent = pair[1];
+      row.appendChild(label);
+      row.appendChild(value);
+      body.appendChild(row);
+    });
+    card.appendChild(body);
+
+    card.addEventListener('click', function() {
+      const open = body.style.display !== 'none';
+      body.style.display = open ? 'none' : 'block';
+      chevron.style.transform = open ? 'none' : 'rotate(180deg)';
     });
 
     return card;

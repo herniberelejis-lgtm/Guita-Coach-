@@ -33,17 +33,17 @@ except ImportError:
 
 
 _DATE_PATTERNS = (
-    (re.compile(r"^(\d{4})-(\d{2})-(\d{2})"), lambda m: f"{m[1]}-{m[2]}-{m[3]}"),
-    (re.compile(r"^(\d{2})/(\d{2})/(\d{4})"), lambda m: f"{m[3]}-{m[2]}-{m[1]}"),
-    (re.compile(r"^(\d{2})-(\d{2})-(\d{4})"), lambda m: f"{m[3]}-{m[2]}-{m[1]}"),
+    (re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})"), lambda m: f"{m[1]}-{int(m[2]):02d}-{int(m[3]):02d}"),
+    (re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})"), lambda m: f"{m[3]}-{int(m[2]):02d}-{int(m[1]):02d}"),
+    (re.compile(r"^(\d{1,2})-(\d{1,2})-(\d{4})"), lambda m: f"{m[3]}-{int(m[2]):02d}-{int(m[1]):02d}"),
 )
 
 
 def _parse_date(raw: str) -> Optional[str]:
     """Parse date in multiple formats to YYYY-MM-DD.
 
-    Supports: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY
-    Returns None if date cannot be parsed.
+    Supports: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, with or without zero-padding
+    (e.g. "5/3/2026" as well as "05/03/2026"). Returns None if date cannot be parsed.
     """
     raw = (raw or "").strip()
     for pattern, build in _DATE_PATTERNS:
@@ -131,13 +131,23 @@ def _get_headers_lower(row: list[str]) -> list[str]:
     return [cell.lower().strip() for cell in row]
 
 
+def _is_cocos_account_statement(headers: list[str]) -> bool:
+    """Detect Cocos Capital's real account-statement export.
+
+    Columns: nroTicket;nroComprobante;fechaEjecucion;fechaLiquidacion;tipoOperacion;
+    instrumento;moneda;mercado;cantidad;precio;montoBruto;comision;...;total
+    """
+    return "nroticket" in headers and "tipooperacion" in headers and "instrumento" in headers
+
+
 def detect_broker(csv_bytes: bytes) -> Optional[str]:
     """Auto-detect broker format from CSV headers.
 
     Returns one of: "cocos_capital", "invertir_online", "bull_market", or None.
 
     Detection strategy:
-    - Cocos Capital: has 'especie' AND 'comision' in headers
+    - Cocos Capital (account statement): has 'nroticket' AND 'tipooperacion' AND 'instrumento'
+    - Cocos Capital (simple format): has 'especie' AND 'comision' in headers
     - Invertir Online: has 'isin' AND 'liquidacion' in headers
     - Bull Market: has 'simbolo' OR ('instrumento' AND 'tipooperacion') in headers
     """
@@ -152,6 +162,9 @@ def detect_broker(csv_bytes: bytes) -> Optional[str]:
         return None
 
     headers = _get_headers_lower(rows[0])
+
+    if _is_cocos_account_statement(headers):
+        return "cocos_capital"
 
     # Check for Cocos Capital (has both especie and comision)
     if "especie" in headers and "comision" in headers:
@@ -170,25 +183,109 @@ def detect_broker(csv_bytes: bytes) -> Optional[str]:
     return None
 
 
-def parse_cocos_csv(csv_bytes: bytes) -> list[dict]:
-    """Parse Cocos Capital CSV format.
+def _cocos_account_statement_tx_type(tipo_operacion: str) -> Optional[str]:
+    """Map a Cocos tipoOperacion value to "buy"/"sell", or None if it's not a trade.
 
-    Expected columns: Fecha, Tipo, Especie, Cantidad, Precio, Comision, Total
-    Tipo values: "Compra" (buy) or "Venta" (sell)
+    Covers plain Compra/Venta, FX/bond MEP operations (Compra/Venta bono...), and
+    FCI movements (Liquidacion Suscripcion Fci = buy, Liquidacion Rescate Fci = sell).
+    Cash movements (Recibo De Cobro, Orden De Pago, Dividendos en especie) return None.
     """
-    text = _read_text(csv_bytes)
-    if not text:
+    t = tipo_operacion.lower()
+    if "venta" in t or "rescate" in t:
+        return "sell"
+    if "compra" in t or "suscripcion" in t:
+        return "buy"
+    return None
+
+
+def _extract_ticker_from_instrumento(instrumento: str) -> str:
+    """Extract the ticker from a Cocos 'instrumento' description like
+    'CEDEAR DE MICROSOFT CORP. (MSFT)' -> 'MSFT'."""
+    raw = instrumento.strip()
+    if "(" in raw and ")" in raw:
+        raw = raw[raw.rfind("(") + 1:raw.rfind(")")]
+    return raw.upper()
+
+
+def _parse_cocos_account_statement(rows: list[list[str]]) -> list[dict]:
+    """Parse Cocos Capital's real account-statement export (rows already split).
+
+    Columns: nroTicket;nroComprobante;fechaEjecucion;fechaLiquidacion;tipoOperacion;
+    instrumento;moneda;mercado;cantidad;precio;montoBruto;comision;...;total
+
+    tipoOperacion drives buy/sell direction (quantity sign in the source file is
+    not reliable for FCI redemptions, so quantity is always normalized to abs()).
+    Cash movements (deposits, withdrawals, in-kind dividends) are skipped.
+    """
+    if not rows:
         return []
 
-    delimiter = _detect_delimiter(text)
-    rows = list(csv.reader(io.StringIO(text), delimiter=delimiter))
+    headers = _get_headers_lower(rows[0])
+    col_indices = {}
+    for i, h in enumerate(headers):
+        if "fecha" in h:
+            col_indices["fecha"] = i
+        elif "tipooperacion" in h:
+            col_indices["tipooperacion"] = i
+        elif "instrumento" in h:
+            col_indices["instrumento"] = i
+        elif "cantidad" in h:
+            col_indices["cantidad"] = i
+        elif "precio" in h:
+            col_indices["precio"] = i
 
+    required = {"fecha", "tipooperacion", "instrumento", "cantidad", "precio"}
+    if not required.issubset(col_indices.keys()):
+        return []
+
+    items = []
+    for row in rows[1:]:
+        if len(row) <= max(col_indices.values()):
+            continue
+
+        tx_type = _cocos_account_statement_tx_type(str(row[col_indices["tipooperacion"]]))
+        if tx_type is None:
+            continue
+
+        date = _parse_date(str(row[col_indices["fecha"]]))
+        if not date:
+            continue
+
+        ticker = _extract_ticker_from_instrumento(str(row[col_indices["instrumento"]]))
+        if not ticker:
+            continue
+
+        quantity = _parse_amount(str(row[col_indices["cantidad"]]))
+        if quantity is None or quantity == 0:
+            continue
+        quantity = abs(quantity)
+
+        price = _parse_amount(str(row[col_indices["precio"]]))
+        if price is None or price <= 0:
+            continue
+
+        csv_reference = f"cocos_{date}_{ticker}_{quantity}"
+
+        items.append({
+            "date": date,
+            "tx_type": tx_type,
+            "ticker": ticker,
+            "quantity": quantity,
+            "price": price,
+            "broker": "cocos_capital",
+            "csv_reference": csv_reference,
+        })
+
+    return items
+
+
+def _parse_cocos_simple(rows: list[list[str]]) -> list[dict]:
+    """Parse Cocos Capital's simple format: Fecha, Tipo, Especie, Cantidad, Precio, Comision, Total."""
     if not rows:
         return []
 
     headers = _get_headers_lower(rows[0])
 
-    # Find column indices
     col_indices = {}
     for i, h in enumerate(headers):
         if "fecha" in h:
@@ -202,7 +299,6 @@ def parse_cocos_csv(csv_bytes: bytes) -> list[dict]:
         elif "precio" in h:
             col_indices["precio"] = i
 
-    # Validate we have minimum required columns
     required = {"fecha", "tipo", "especie", "cantidad", "precio"}
     if not required.issubset(col_indices.keys()):
         return []
@@ -244,6 +340,25 @@ def parse_cocos_csv(csv_bytes: bytes) -> list[dict]:
         })
 
     return items
+
+
+def parse_cocos_csv(csv_bytes: bytes) -> list[dict]:
+    """Parse Cocos Capital CSV, auto-detecting between the real account-statement
+    export and the simple Fecha/Tipo/Especie/Cantidad/Precio format."""
+    text = _read_text(csv_bytes)
+    if not text:
+        return []
+
+    delimiter = _detect_delimiter(text)
+    rows = list(csv.reader(io.StringIO(text), delimiter=delimiter))
+
+    if not rows:
+        return []
+
+    headers = _get_headers_lower(rows[0])
+    if _is_cocos_account_statement(headers):
+        return _parse_cocos_account_statement(rows)
+    return _parse_cocos_simple(rows)
 
 
 def parse_invertir_online_csv(csv_bytes: bytes) -> list[dict]:
@@ -458,6 +573,9 @@ def _detect_broker_from_rows(rows: list[list]) -> Optional[str]:
 
     headers = _get_headers_lower(rows[0])
 
+    if _is_cocos_account_statement(headers):
+        return "cocos_capital"
+
     if "especie" in headers and "comision" in headers:
         return "cocos_capital"
 
@@ -484,6 +602,9 @@ def _rows_to_transactions(rows: list[list], broker: str) -> list[dict]:
         return []
 
     headers = _get_headers_lower(rows[0])
+
+    if broker == "cocos_capital" and _is_cocos_account_statement(headers):
+        return _parse_cocos_account_statement(rows)
 
     col_indices = {}
     for i, h in enumerate(headers):
@@ -574,10 +695,121 @@ def _rows_to_transactions(rows: list[list], broker: str) -> list[dict]:
     return items
 
 
+def _is_ppi_ledger_sheet(headers: list[str]) -> bool:
+    """Detect a PPI (Portfolio Personal Inversiones) cash-ledger sheet.
+
+    Columns: Fecha, Descripcion, Cantidad, Precio, Importe, Saldo, Moneda.
+    PPI exports one ledger sheet per currency (e.g. 'Pesos', 'DolarCV7000 Ext.')
+    plus an 'Instrumentos' summary sheet that lacks Importe/Saldo and is skipped.
+    """
+    return (
+        "fecha" in headers
+        and "cantidad" in headers
+        and "precio" in headers
+        and "importe" in headers
+        and "saldo" in headers
+    )
+
+
+def _parse_ppi_ledger_rows(rows: list[list]) -> list[dict]:
+    """Parse one PPI ledger sheet's raw rows (as returned by openpyxl values_only).
+
+    Only rows whose Descripcion starts with 'COMPRA '/'VENTA ' are security trades;
+    deposits, withdrawals, and cash dividends ('Ingreso de Fondos', 'Retiro de
+    Fondos', 'Dividendo en efectivo') are skipped.
+    """
+    if not rows:
+        return []
+
+    headers = _get_headers_lower([str(h) if h is not None else "" for h in rows[0]])
+    col = {}
+    for i, h in enumerate(headers):
+        if "fecha" in h:
+            col["fecha"] = i
+        elif "descrip" in h:
+            col["descripcion"] = i
+        elif "cantidad" in h:
+            col["cantidad"] = i
+        elif "precio" in h:
+            col["precio"] = i
+
+    required = {"fecha", "descripcion", "cantidad", "precio"}
+    if not required.issubset(col.keys()):
+        return []
+
+    items = []
+    for row in rows[1:]:
+        if len(row) <= max(col.values()):
+            continue
+
+        descripcion = str(row[col["descripcion"]] or "").strip()
+        lower_desc = descripcion.lower()
+        if lower_desc.startswith("compra "):
+            tx_type = "buy"
+            ticker = descripcion[len("COMPRA "):].strip().upper()
+        elif lower_desc.startswith("venta "):
+            tx_type = "sell"
+            ticker = descripcion[len("VENTA "):].strip().upper()
+        else:
+            continue
+
+        if not ticker:
+            continue
+
+        date_val = row[col["fecha"]]
+        if isinstance(date_val, str):
+            date = _parse_date(date_val)
+        else:
+            from datetime import datetime
+            date = date_val.strftime("%Y-%m-%d") if isinstance(date_val, datetime) else None
+        if not date:
+            continue
+
+        qty_val = row[col["cantidad"]]
+        quantity = float(qty_val) if isinstance(qty_val, (int, float)) else _parse_amount(str(qty_val))
+        if quantity is None or quantity == 0:
+            continue
+        quantity = abs(quantity)
+
+        price_val = row[col["precio"]]
+        price = float(price_val) if isinstance(price_val, (int, float)) else _parse_amount(str(price_val))
+        if price is None or price <= 0:
+            continue
+
+        csv_reference = f"ppi_{date}_{ticker}_{quantity}"
+
+        items.append({
+            "date": date,
+            "tx_type": tx_type,
+            "ticker": ticker,
+            "quantity": quantity,
+            "price": price,
+            "broker": "ppi",
+            "csv_reference": csv_reference,
+        })
+
+    return items
+
+
+def _parse_ppi_workbook(wb) -> list[dict]:
+    """Parse all PPI ledger sheets in a workbook (one sheet per currency)."""
+    items = []
+    for sheet_name in wb.sheetnames:
+        rows = list(wb[sheet_name].iter_rows(values_only=True))
+        if not rows:
+            continue
+        headers = _get_headers_lower([str(h) if h is not None else "" for h in rows[0]])
+        if _is_ppi_ledger_sheet(headers):
+            items.extend(_parse_ppi_ledger_rows(rows))
+    return items
+
+
 def parse_xlsx(xlsx_bytes: bytes) -> Tuple[Optional[str], list[dict]]:
     """Parse Excel file (.xlsx) for investment transactions.
 
-    Auto-detects broker format from headers.
+    Auto-detects broker format from headers. Single-sheet brokers (Cocos,
+    Invertir Online, Bull Market) are checked first via the active sheet; if
+    none match, falls back to PPI's multi-sheet (one ledger per currency) format.
     Returns tuple of (broker_name, items_list).
     """
     if not OPENPYXL_AVAILABLE:
@@ -593,15 +825,17 @@ def parse_xlsx(xlsx_bytes: bytes) -> Tuple[Optional[str], list[dict]]:
             row_list = [str(cell) if cell is not None else "" for cell in row]
             rows.append(row_list)
 
-        if not rows:
-            return None, []
+        if rows:
+            broker = _detect_broker_from_rows(rows)
+            if broker:
+                items = _rows_to_transactions(rows, broker)
+                return broker, items
 
-        broker = _detect_broker_from_rows(rows)
-        if not broker:
-            return None, []
+        ppi_items = _parse_ppi_workbook(wb)
+        if ppi_items:
+            return "ppi", ppi_items
 
-        items = _rows_to_transactions(rows, broker)
-        return broker, items
+        return None, []
 
     except Exception:
         return None, []

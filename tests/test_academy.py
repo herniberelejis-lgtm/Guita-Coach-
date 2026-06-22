@@ -122,3 +122,14 @@ class TestAcademyEndpoint:
         total = sum(len(c["topics"]) for c in data["categories"])
         from app.services.academy_content import TOPICS
         assert total == len(TOPICS)
+
+    def test_glossary_has_20_terms_with_all_fields(self, client):
+        _login(client, ahorro_pct=20, income_is_variable=False)
+        response = client.get("/api/academy")
+        data = response.json()
+        assert len(data["glossary"]) == 20
+        for term in data["glossary"]:
+            assert term["term"]
+            assert term["definition_formal"]
+            assert term["definition_simple"]
+            assert term["example"]

@@ -187,3 +187,332 @@ CATEGORY_LABELS = {
     "indicadores": "Indicadores financieros",
     "riesgo": "Risk management",
 }
+
+GLOSSARY = [
+    {
+        "term": "Activo",
+        "definition_formal": (
+            "Un activo es cualquier recurso económico que una persona o empresa posee y que tiene "
+            "la capacidad de generar valor futuro, ya sea por su uso, venta o por los ingresos que produce."
+        ),
+        "definition_simple": (
+            "Es todo lo que tenés y que te puede dar plata o se puede vender. Si lo tenés y te suma, "
+            "es un activo."
+        ),
+        "example": (
+            "Un plazo fijo, las acciones que compraste, tu auto si lo usás para trabajar de Uber, "
+            "o el dinero en tu caja de ahorro. Todo eso son activos."
+        ),
+    },
+    {
+        "term": "Pasivo",
+        "definition_formal": (
+            "Un pasivo es una obligación financiera o deuda que una persona o empresa debe afrontar, "
+            "es decir, dinero que le debés a alguien."
+        ),
+        "definition_simple": (
+            "Es lo que le debés a otro. Si lo tenés y te saca plata del bolsillo todos los meses, "
+            "es un pasivo."
+        ),
+        "example": (
+            "El saldo de tu tarjeta de crédito, un préstamo personal, o las cuotas de un crédito "
+            "hipotecario. Todo eso es plata que tenés que devolver."
+        ),
+    },
+    {
+        "term": "Presupuesto",
+        "definition_formal": (
+            "Un presupuesto es un plan financiero que organiza los ingresos y egresos esperados "
+            "durante un período determinado, permitiendo controlar el destino del dinero."
+        ),
+        "definition_simple": (
+            "Es armar de antemano en qué vas a gastar la plata que entra, para no terminar el mes "
+            "preguntándote a dónde se fue todo."
+        ),
+        "example": (
+            "Si ganás $500.000 por mes, un presupuesto simple sería: $250.000 para alquiler y comida "
+            "(necesidades), $150.000 para salidas y gustos, y $100.000 para ahorro."
+        ),
+    },
+    {
+        "term": "Fondo de Emergencia",
+        "definition_formal": (
+            "Es una reserva de dinero líquida destinada a cubrir gastos imprevistos o pérdida de "
+            "ingresos, generalmente equivalente a 3-6 meses de gastos esenciales."
+        ),
+        "definition_simple": (
+            "Es la plata que dejás guardada 'por si las moscas' — se te rompe el auto, te echan del "
+            "trabajo, o te enfermás. Está ahí para que un imprevisto no te funda."
+        ),
+        "example": (
+            "Si gastás $300.000 por mes en lo esencial, tu fondo de emergencia ideal sería de "
+            "$1.800.000, guardado en algo líquido como una caja de ahorro o un FCI money market, "
+            "no en algo que tarde semanas en convertirse en efectivo."
+        ),
+    },
+    {
+        "term": "Inflación",
+        "definition_formal": (
+            "La inflación es el aumento generalizado y sostenido de los precios de bienes y servicios "
+            "en una economía, que reduce el poder de compra de la moneda."
+        ),
+        "definition_simple": (
+            "Es cuando la plata vale cada vez menos. Lo que hoy comprás con $1.000, el mes que viene "
+            "te sale más caro, aunque el billete sea el mismo."
+        ),
+        "example": (
+            "Si el kilo de asado costaba $3.000 el año pasado y hoy cuesta $4.500, gran parte de ese "
+            "aumento es inflación: la plata se devaluó, no necesariamente el asado se hizo 'mejor'."
+        ),
+    },
+    {
+        "term": "Tasa de Interés (Nominal vs. Real)",
+        "definition_formal": (
+            "La tasa nominal es el porcentaje de interés que se cobra o paga sin ajustar por "
+            "inflación. La tasa real es ese mismo interés descontando la inflación del período, y "
+            "refleja la ganancia o pérdida real de poder de compra."
+        ),
+        "definition_simple": (
+            "La nominal es el número que te muestran en el cartel del banco. La real es la posta: "
+            "cuánto realmente ganaste después de que la inflación se comió una parte."
+        ),
+        "example": (
+            "Si un plazo fijo te paga 5% mensual (nominal) pero la inflación de ese mes fue 4%, tu "
+            "tasa real es de apenas ~1%. Ganaste mucho menos de lo que el cartel prometía."
+        ),
+    },
+    {
+        "term": "Interés Compuesto",
+        "definition_formal": (
+            "Es el mecanismo por el cual los intereses generados por una inversión se reinvierten, "
+            "generando a su vez nuevos intereses sobre el capital acumulado, no solo sobre el "
+            "capital inicial."
+        ),
+        "definition_simple": (
+            "Es 'el interés que genera interés'. Como una bola de nieve: cuanto más tiempo la dejás "
+            "rodar, más grande se hace, no porque la empujes más fuerte sino porque va sumando sobre "
+            "lo que ya sumó."
+        ),
+        "example": (
+            "Si invertís $100.000 al 5% mensual y reinvertís las ganancias, el primer mes tenés "
+            "$105.000. El segundo mes el 5% se calcula sobre $105.000 (no sobre los $100.000 "
+            "originales), y así crece cada vez más rápido con el tiempo."
+        ),
+    },
+    {
+        "term": "Rendimiento (ROI)",
+        "definition_formal": (
+            "El Retorno de Inversión (ROI) es una métrica que mide la ganancia o pérdida generada "
+            "por una inversión en relación al capital invertido, expresada generalmente en porcentaje."
+        ),
+        "definition_simple": (
+            "Es la respuesta a la pregunta '¿cuánto gané (o perdí) en relación a lo que puse?'."
+        ),
+        "example": (
+            "Si invertiste $50.000 en una acción y hoy esa posición vale $60.000, tu ROI es del 20% "
+            "— ganaste $10.000 sobre los $50.000 que pusiste."
+        ),
+    },
+    {
+        "term": "Liquidez",
+        "definition_formal": (
+            "La liquidez es la facilidad y rapidez con la que un activo puede convertirse en dinero "
+            "en efectivo sin perder valor significativo."
+        ),
+        "definition_simple": (
+            "Es qué tan rápido podés volver tu inversión en plata contante y sonante si la necesitás "
+            "de un día para el otro."
+        ),
+        "example": (
+            "El dinero en tu caja de ahorro es súper líquido (lo sacás ya). Un plazo fijo a 30 días "
+            "es menos líquido (tenés que esperar o pagar una penalidad). Un departamento es muy poco "
+            "líquido (puede tardar meses en venderse)."
+        ),
+    },
+    {
+        "term": "Diversificación",
+        "definition_formal": (
+            "La diversificación es una estrategia de gestión de riesgo que consiste en distribuir "
+            "las inversiones entre distintos activos, sectores o monedas, para reducir el impacto "
+            "de que uno de ellos rinda mal."
+        ),
+        "definition_simple": (
+            "Es no poner todos los huevos en la misma canasta. Si se te cae una canasta, no perdés "
+            "todos los huevos."
+        ),
+        "example": (
+            "En vez de poner el 100% de tus ahorros en una sola acción, repartís entre cedears, "
+            "bonos, un poco de plazo fijo y quizás algo de cripto. Si una de esas inversiones rinde "
+            "mal, las otras pueden compensar."
+        ),
+    },
+    {
+        "term": "Perfil de Riesgo (Conservador, Moderado, Agresivo)",
+        "definition_formal": (
+            "El perfil de riesgo es la clasificación del nivel de volatilidad y posible pérdida de "
+            "capital que un inversor está dispuesto a tolerar, en función de su situación financiera, "
+            "objetivos y horizonte temporal."
+        ),
+        "definition_simple": (
+            "Es cuánto 'sobresalto' podés bancarte ver en tu cuenta de inversión sin perder el sueño. "
+            "Conservador: dormís tranquilo aunque ganes poco. Agresivo: aguantás bajones grandes a "
+            "cambio de buscar ganancias mayores."
+        ),
+        "example": (
+            "Un perfil conservador prioriza un FCI money market o plazo fijo. Un perfil moderado "
+            "mezcla bonos y algunos cedears. Un perfil agresivo puede tener gran parte de su cartera "
+            "en acciones o cripto, aceptando que el valor suba y baje fuerte en el camino."
+        ),
+    },
+    {
+        "term": "Volatilidad",
+        "definition_formal": (
+            "La volatilidad mide la magnitud y frecuencia de las variaciones de precio de un activo "
+            "en un período determinado; a mayor volatilidad, mayor incertidumbre sobre su valor "
+            "futuro a corto plazo."
+        ),
+        "definition_simple": (
+            "Es cuánto 'sube y baja' el precio de algo. Una inversión volátil es una montaña rusa; "
+            "una poco volátil es una calle recta."
+        ),
+        "example": (
+            "El bitcoin puede subir 10% en un día y bajar 15% al día siguiente: alta volatilidad. "
+            "Un plazo fijo no se mueve un centavo día a día: volatilidad prácticamente nula."
+        ),
+    },
+    {
+        "term": "Renta Fija (ej. Plazo Fijo, Bonos)",
+        "definition_formal": (
+            "La renta fija comprende instrumentos de inversión que ofrecen un rendimiento predefinido "
+            "o pactado de antemano (tasa fija o variable conocida), con menor riesgo relativo y menor "
+            "potencial de ganancia que la renta variable."
+        ),
+        "definition_simple": (
+            "Es 'prestarle' tu plata a alguien (un banco, el Estado, una empresa) a cambio de que te "
+            "devuelva más de lo que pusiste, en un plazo y con condiciones que ya sabés de antemano."
+        ),
+        "example": (
+            "Un plazo fijo en el banco, o un bono soberano argentino (como un AL30), te dicen de "
+            "entrada cuánto vas a cobrar y cuándo. Es más predecible, aunque no está exento de riesgo "
+            "(el emisor podría no pagar)."
+        ),
+    },
+    {
+        "term": "Renta Variable (ej. Acciones, Cedears)",
+        "definition_formal": (
+            "La renta variable agrupa instrumentos cuyo rendimiento no está garantizado de antemano, "
+            "ya que depende de la evolución del mercado y del desempeño del activo subyacente, "
+            "ofreciendo mayor potencial de ganancia (y de pérdida)."
+        ),
+        "definition_simple": (
+            "Es comprar una porción de una empresa (o de un fondo que sigue empresas) sin saber de "
+            "antemano si vas a ganar o perder, ni cuánto. Podés ganar mucho, pero también podés perder."
+        ),
+        "example": (
+            "Comprar acciones de YPF, o un cedear de Apple, son renta variable: su precio sube o baja "
+            "todos los días según cómo le va a la empresa y al mercado."
+        ),
+    },
+    {
+        "term": "Fondo Común de Inversión (FCI)",
+        "definition_formal": (
+            "Un FCI es un vehículo de inversión colectiva que reúne el dinero de muchos inversores "
+            "para invertirlo en una cartera diversificada de activos, administrada por una sociedad "
+            "gerente, según la estrategia declarada del fondo."
+        ),
+        "definition_simple": (
+            "Es juntar tu plata con la de un montón de gente más para que un equipo profesional la "
+            "invierta por todos, repartiendo entre varios activos. Vos comprás 'cuotapartes' del fondo."
+        ),
+        "example": (
+            "Un FCI money market invierte en instrumentos de corto plazo y muy líquidos, ideal para "
+            "parquear el fondo de emergencia. Un FCI de renta variable invierte en acciones, con más "
+            "riesgo y potencial de ganancia."
+        ),
+    },
+    {
+        "term": "Bróker (o Agente de Liquidación y Compensación - ALyC)",
+        "definition_formal": (
+            "Un bróker o ALyC es una entidad regulada y autorizada para actuar como intermediario en "
+            "la compra y venta de instrumentos financieros en los mercados de valores, ejecutando las "
+            "órdenes de sus clientes."
+        ),
+        "definition_simple": (
+            "Es la 'puerta de entrada' al mercado. Vos no podés comprar acciones directamente en la "
+            "bolsa; necesitás a alguien habilitado que lo haga por vos."
+        ),
+        "example": (
+            "Cocos Capital, Bull Market, Invertir Online o Portfolio Personal son ALyC/brokers donde "
+            "abrís una cuenta para comprar y vender acciones, bonos o cedears en Argentina."
+        ),
+    },
+    {
+        "term": "Dividendos",
+        "definition_formal": (
+            "Los dividendos son la porción de las ganancias de una empresa que se distribuye entre "
+            "sus accionistas, generalmente en efectivo o en nuevas acciones, como retribución por "
+            "mantener la inversión."
+        ),
+        "definition_simple": (
+            "Es cuando la empresa de la que sos 'dueño' (por tener sus acciones) te da una parte de "
+            "lo que ganó, sin que tengas que vender nada."
+        ),
+        "example": (
+            "Si tenés acciones de una empresa que reparte dividendos y declara un pago de $50 por "
+            "acción, y vos tenés 100 acciones, cobrás $5.000 simplemente por ser accionista, además "
+            "de cualquier suba o baja del precio de la acción."
+        ),
+    },
+    {
+        "term": "Bull Market vs. Bear Market (Mercado Alcista y Bajista)",
+        "definition_formal": (
+            "Un mercado alcista (bull market) es un período prolongado de subas generalizadas en los "
+            "precios de los activos, asociado a optimismo y crecimiento económico. Un mercado bajista "
+            "(bear market) es lo opuesto: una caída sostenida de precios, generalmente vinculada a "
+            "pesimismo o recesión."
+        ),
+        "definition_simple": (
+            "Bull market es cuando 'todo sube' y la gente está optimista, como un toro que embiste "
+            "para arriba con los cuernos. Bear market es cuando 'todo baja' y el clima es de "
+            "pesimismo, como un oso que ataca golpeando hacia abajo con sus patas."
+        ),
+        "example": (
+            "Durante un bull market, comprar casi cualquier acción tiende a darte ganancia con el "
+            "tiempo. Durante un bear market, hasta las buenas empresas pueden ver caer su valor por "
+            "el clima general del mercado."
+        ),
+    },
+    {
+        "term": "ETF (Exchange-Traded Fund)",
+        "definition_formal": (
+            "Un ETF es un fondo de inversión que cotiza en bolsa como si fuera una acción, y que "
+            "generalmente busca replicar el comportamiento de un índice, sector o canasta de activos."
+        ),
+        "definition_simple": (
+            "Es como comprar 'un combo' de muchas empresas o activos de una sola vez, con una sola "
+            "operación, en lugar de comprar cada una por separado."
+        ),
+        "example": (
+            "El ETF SPY busca replicar el índice S&P 500 de Estados Unidos. Comprando una sola unidad "
+            "de SPY, estás 'comprando un poquito' de las 500 empresas más grandes de EE.UU. al mismo "
+            "tiempo."
+        ),
+    },
+    {
+        "term": "Capacidad de Ahorro",
+        "definition_formal": (
+            "La capacidad de ahorro es la proporción de los ingresos que una persona puede destinar "
+            "a ahorro o inversión después de cubrir todos sus gastos, y depende tanto del nivel de "
+            "ingresos como de los hábitos de consumo."
+        ),
+        "definition_simple": (
+            "Es cuánto te queda realmente disponible para guardar o invertir después de pagar todo "
+            "lo que tenés que pagar. No depende solo de cuánto ganás, sino también de cuánto gastás."
+        ),
+        "example": (
+            "Dos personas pueden ganar lo mismo ($500.000), pero si una gasta $480.000 y la otra "
+            "$350.000, la segunda tiene una capacidad de ahorro mucho mayor ($150.000 vs $20.000), "
+            "aunque ganen exactamente igual."
+        ),
+    },
+]

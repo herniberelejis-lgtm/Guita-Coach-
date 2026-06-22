@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import User, Investment
 from ..security import get_current_user
-from ..services.academy_content import TOPICS, CATEGORY_LABELS
+from ..services.academy_content import TOPICS, CATEGORY_LABELS, GLOSSARY
 
 router = APIRouter(prefix="/api/academy", tags=["academy"])
 
@@ -49,4 +49,5 @@ def get_academy(db: Session = Depends(get_db), user: User = Depends(get_current_
     return {
         "recommended": [{k: v for k, v in t.items() if k != "score"} for t in recommended],
         "categories": categories,
+        "glossary": GLOSSARY,
     }

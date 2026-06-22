@@ -1,5 +1,10 @@
 """Tests for investment CSV/XLSX parser."""
+import io
+from datetime import date
+
 import pytest
+from openpyxl import Workbook
+
 from app.services.investment_parser import (
     parse_csv,
     parse_xlsx,
@@ -30,6 +35,12 @@ class TestParseDate:
         assert _parse_date("invalid") is None
         assert _parse_date("") is None
         assert _parse_date(None) is None
+
+    def test_unpadded_day_and_month(self):
+        """DD/MM/YYYY without zero-padding (e.g. real Cocos exports use 5/3/2026)."""
+        assert _parse_date("5/3/2026") == "2026-03-05"
+        assert _parse_date("13/1/2026") == "2026-01-13"
+        assert _parse_date("4/12/2026") == "2026-12-04"
 
 
 class TestParseAmount:
@@ -145,6 +156,170 @@ class TestParseColosCSV:
         assert broker == "cocos_capital"
         assert len(items) == 1
         assert items[0]["price"] == 150.50
+
+
+class TestParseCocosAccountStatement:
+    """Test parsing Cocos Capital's real account-statement export."""
+
+    def test_detects_as_cocos_capital_not_bull_market(self):
+        """The real export shares 'instrumento'+'tipoOperacion' with Bull Market's
+        generic check, but must be classified as cocos_capital."""
+        csv_content = (
+            "nroTicket;nroComprobante;fechaEjecucion;fechaLiquidacion;tipoOperacion;"
+            "instrumento;moneda;mercado;cantidad;precio;montoBruto;comision;ddmm;iva;otros;total\n"
+            "82006886;420257;13/1/2026;14/1/2026;Compra;CELULOSA ARGENTINA S.A. - ORD. 1V. (CELU);"
+            "ARS;BYMA;246;415;-102.090;-459,405;-51,045;-107,1945;0;-102.707,64"
+        ).encode("utf-8")
+
+        broker, items = parse_csv(csv_content)
+
+        assert broker == "cocos_capital"
+        assert len(items) == 1
+        assert items[0]["ticker"] == "CELU"
+        assert items[0]["tx_type"] == "buy"
+        assert items[0]["quantity"] == 246.0
+        assert items[0]["price"] == 415.0
+        assert items[0]["date"] == "2026-01-14"
+
+    def test_unpadded_dates_are_not_dropped(self):
+        """Real Cocos exports use unpadded dates (e.g. 5/3/2026); previously every
+        row was silently dropped because the date regex required 2-digit day/month."""
+        csv_content = (
+            "nroTicket;nroComprobante;fechaEjecucion;fechaLiquidacion;tipoOperacion;"
+            "instrumento;moneda;mercado;cantidad;precio;montoBruto;comision;ddmm;iva;otros;total\n"
+            "99428084;2667036;31/3/2026;1/4/2026;Compra;CEDEAR DE MICROSOFT CORP. (MSFT);"
+            "ARS;BYMA;3;18.170;-54.510;-245,295;-27,255;-57,2355;0;-54.839,79"
+        ).encode("utf-8")
+
+        broker, items = parse_csv(csv_content)
+
+        assert len(items) == 1
+        assert items[0]["date"] == "2026-04-01"
+        assert items[0]["ticker"] == "MSFT"
+
+    def test_fci_subscription_is_buy_and_redemption_is_sell(self):
+        """Liquidacion Suscripcion Fci -> buy; Liquidacion Rescate Fci -> sell.
+        The source quantity is negative for redemptions but must be normalized
+        to a positive value, with direction taken from tipoOperacion."""
+        csv_content = (
+            "nroTicket;nroComprobante;fechaEjecucion;fechaLiquidacion;tipoOperacion;"
+            "instrumento;moneda;mercado;cantidad;precio;montoBruto;comision;ddmm;iva;otros;total\n"
+            "109157369;4633608;9/6/2026;9/6/2026;Liquidacion Suscripcion Fci;"
+            "FCI COCOS PESOS PLUS CL.A $ (COCOSPPA);ARS;;87.204,22;1.380,00;-120.342;0;0;0;0;-120.342\n"
+            "109307664;4681139;10/6/2026;11/6/2026;Liquidacion Rescate Fci;"
+            "FCI COCOS PESOS PLUS CL.A $ (COCOSPPA);ARS;;-87.204,22;1.380,62;120.396,15;0;0;0;0;120.396,15"
+        ).encode("utf-8")
+
+        broker, items = parse_csv(csv_content)
+
+        assert len(items) == 2
+        assert items[0]["tx_type"] == "buy"
+        assert items[0]["quantity"] == pytest.approx(87204.22)
+        assert items[1]["tx_type"] == "sell"
+        assert items[1]["quantity"] == pytest.approx(87204.22)
+
+    def test_cash_movements_are_skipped(self):
+        """Recibo De Cobro / Orden De Pago are cash deposits/withdrawals, not trades."""
+        csv_content = (
+            "nroTicket;nroComprobante;fechaEjecucion;fechaLiquidacion;tipoOperacion;"
+            "instrumento;moneda;mercado;cantidad;precio;montoBruto;comision;ddmm;iva;otros;total\n"
+            "99243626;13932313;31/3/2026;31/3/2026;Recibo De Cobro;;ARS;;;;100.000;0;0;0;0;100.000\n"
+            "99428085;13932314;31/3/2026;31/3/2026;Orden De Pago;;ARS;;;;-100.000;0;0;0;0;-100.000"
+        ).encode("utf-8")
+
+        broker, items = parse_csv(csv_content)
+
+        assert items == []
+
+
+def _make_ppi_workbook(sheets: dict) -> bytes:
+    """Build an in-memory PPI-style workbook from {sheet_name: [rows]}."""
+    wb = Workbook()
+    wb.remove(wb.active)
+    for name, rows in sheets.items():
+        ws = wb.create_sheet(title=name)
+        for row in rows:
+            ws.append(row)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+class TestParsePPIWorkbook:
+    """Test parsing PPI's multi-sheet (one ledger per currency) account export."""
+
+    def test_compra_and_venta_rows_become_trades(self):
+        xlsx_bytes = _make_ppi_workbook({
+            "Pesos": [
+                ["Fecha", "Descripcion", "Cantidad", "Precio", "Importe", "Saldo", "Moneda"],
+                [date(2026, 6, 4), "COMPRA SPY", 11, 19131.82, -212105.19, 8500.62, "Pesos"],
+                [date(2026, 5, 8), "VENTA SPY", -2, 54900, 108936.42, 108904.86, "Pesos"],
+            ],
+        })
+
+        broker, items = parse_xlsx(xlsx_bytes)
+
+        assert broker == "ppi"
+        assert len(items) == 2
+        assert items[0]["tx_type"] == "buy"
+        assert items[0]["ticker"] == "SPY"
+        assert items[0]["quantity"] == 11.0
+        assert items[0]["price"] == 19131.82
+        assert items[0]["date"] == "2026-06-04"
+        assert items[1]["tx_type"] == "sell"
+        assert items[1]["quantity"] == 2.0
+
+    def test_cash_movements_and_dividends_are_skipped(self):
+        xlsx_bytes = _make_ppi_workbook({
+            "Pesos": [
+                ["Fecha", "Descripcion", "Cantidad", "Precio", "Importe", "Saldo", "Moneda"],
+                [date(2026, 6, 8), "Retiro de Fondos", 0, 0, -8500.62, 0, "Pesos"],
+                [date(2026, 6, 4), "Ingreso de Fondos", 0, 0, 220000, 220605.81, "Pesos"],
+                [date(2026, 4, 30), "Dividendo en efectivo / SPY", 0, 0, -31.57, -31.56, "Pesos"],
+            ],
+        })
+
+        broker, items = parse_xlsx(xlsx_bytes)
+
+        assert items == []
+
+    def test_instrumentos_summary_sheet_is_ignored(self):
+        """The 'Instrumentos' sheet lacks Importe/Saldo and has price=0; it must
+        not be parsed (the Pesos/currency ledger sheets carry the real price)."""
+        xlsx_bytes = _make_ppi_workbook({
+            "Instrumentos": [
+                ["Fecha", "Descripcion", "Especie", "Cantidad", "Precio", "Moneda"],
+                [date(2026, 6, 4), "COMPRA SPY", "Spdr S&P 500", 11, 0, ""],
+            ],
+            "Pesos": [
+                ["Fecha", "Descripcion", "Cantidad", "Precio", "Importe", "Saldo", "Moneda"],
+                [date(2026, 6, 4), "COMPRA SPY", 11, 19131.82, -212105.19, 8500.62, "Pesos"],
+            ],
+        })
+
+        broker, items = parse_xlsx(xlsx_bytes)
+
+        assert broker == "ppi"
+        assert len(items) == 1
+        assert items[0]["price"] == 19131.82
+
+    def test_multiple_currency_sheets_are_combined(self):
+        xlsx_bytes = _make_ppi_workbook({
+            "Pesos": [
+                ["Fecha", "Descripcion", "Cantidad", "Precio", "Importe", "Saldo", "Moneda"],
+                [date(2026, 6, 4), "COMPRA SPY", 11, 19131.82, -212105.19, 8500.62, "Pesos"],
+            ],
+            "DolarCV7000 Ext.": [
+                ["Fecha", "Descripcion", "Cantidad", "Precio", "Importe", "Saldo", "Moneda"],
+                [date(2026, 5, 1), "COMPRA AAPL", 2, 190.0, -380.0, 100.0, "DolarCV7000 Ext."],
+            ],
+        })
+
+        broker, items = parse_xlsx(xlsx_bytes)
+
+        assert broker == "ppi"
+        tickers = {item["ticker"] for item in items}
+        assert tickers == {"SPY", "AAPL"}
 
 
 class TestParseInvertirOnlineCSV:
