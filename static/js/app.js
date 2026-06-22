@@ -11,6 +11,7 @@ const App = {
     chat:         () => Chat.render(),
     settings:     () => Settings.render(),
     investments:  () => Investments.render(),
+    academy:      () => Academy.render(),
   },
 
   async init() {

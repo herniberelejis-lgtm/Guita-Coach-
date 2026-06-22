@@ -82,4 +82,7 @@ const API = {
   deleteRecurring: (id)     => API.delete(`/goals/recurring/${id}`),
   getDolar:        ()       => API.get('/insights/dolar'),
   getCategories:   (month)  => API.get('/insights/categories' + (month ? '?month=' + month : '')),
+
+  // Academy
+  getAcademy: () => API.get('/academy'),
 };
