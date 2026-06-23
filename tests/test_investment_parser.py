@@ -231,6 +231,30 @@ class TestParseCocosAccountStatement:
 
         assert items == []
 
+    def test_dolar_mep_operations_are_skipped(self):
+        """'Compra/Venta bono Operatoria dolar MEP' pairs are a currency-conversion
+        mechanism (buy the bond in one currency leg, sell it in the other), not a
+        real position. Each leg quotes the same instrument in a different currency
+        (e.g. price 0,071 USD vs 100,8 ARS); averaging them as one holding produced
+        a large phantom position that wasn't real (reported bug: 'me toma una
+        tenencia que no existe')."""
+        csv_content = (
+            "nroTicket;nroComprobante;fechaEjecucion;fechaLiquidacion;tipoOperacion;"
+            "instrumento;moneda;mercado;cantidad;precio;montoBruto;comision;ddmm;iva;otros;total\n"
+            "95278477;2134717;6/3/2026;6/3/2026;Compra bono Operatoria dolar MEP USD;"
+            "ON TARJETA NARANJA CL.66 S.1 30/11/2026 $ (T661O);USD;BYMA;602.816;0,071;-427,9994;0;0;0;0;-428\n"
+            "95303436;2158239;6/3/2026;6/3/2026;Venta bono Operatoria dolar MEP ARS;"
+            "ON TARJETA NARANJA CL.66 S.1 30/11/2026 $ (T661O);ARS;BYMA;-602.816;100,8;607.638,53;0;0;0;0;607.638,53\n"
+            "95309664;2163939;6/3/2026;6/3/2026;Venta bono Operatoria dolar MEP USD;"
+            "ON TARJETA NARANJA CL.66 S.1 30/11/2026 $ (T661O);USD;BYMA;-500.000;0,071;355;0;0;0;0;355\n"
+            "95311836;2165997;6/3/2026;6/3/2026;Compra bono Operatoria dolar MEP ARS;"
+            "ON TARJETA NARANJA CL.66 S.1 30/11/2026 $ (T661O);ARS;BYMA;500.000;100,8;-504.000;0;0;0;0;-504.000"
+        ).encode("utf-8")
+
+        broker, items = parse_csv(csv_content)
+
+        assert items == []
+
 
 def _make_ppi_workbook(sheets: dict) -> bytes:
     """Build an in-memory PPI-style workbook from {sheet_name: [rows]}."""

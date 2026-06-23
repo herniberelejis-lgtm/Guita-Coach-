@@ -186,11 +186,17 @@ def detect_broker(csv_bytes: bytes) -> Optional[str]:
 def _cocos_account_statement_tx_type(tipo_operacion: str) -> Optional[str]:
     """Map a Cocos tipoOperacion value to "buy"/"sell", or None if it's not a trade.
 
-    Covers plain Compra/Venta, FX/bond MEP operations (Compra/Venta bono...), and
-    FCI movements (Liquidacion Suscripcion Fci = buy, Liquidacion Rescate Fci = sell).
-    Cash movements (Recibo De Cobro, Orden De Pago, Dividendos en especie) return None.
+    Covers plain Compra/Venta and FCI movements (Liquidacion Suscripcion Fci = buy,
+    Liquidacion Rescate Fci = sell). "Operatoria dolar MEP" pairs (buy the bond in
+    one currency leg, sell it in the other) are a currency-conversion mechanism, not
+    a real position in the bond, so they're excluded like cash movements (Recibo De
+    Cobro, Orden De Pago, Dividendos en especie) — otherwise the bond shows up as a
+    large phantom holding once the two legs' mismatched per-currency prices get
+    averaged together.
     """
     t = tipo_operacion.lower()
+    if "dolar mep" in t or "dólar mep" in t:
+        return None
     if "venta" in t or "rescate" in t:
         return "sell"
     if "compra" in t or "suscripcion" in t:
