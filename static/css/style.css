@@ -941,6 +941,15 @@ tbody tr:hover { background: rgba(255,255,255,0.02); }
   margin-left: auto;
 }
 .inv-pricehint { font-size: .72rem; color: var(--muted); margin-top: 6px; }
+.linechart-wrap { width: 100%; }
+.linechart { width: 100%; height: 220px; }
+.linechart-grid { stroke: var(--navy3); stroke-width: 1; }
+.linechart-axis { fill: var(--muted); font-size: 9px; font-family: var(--font-body); }
+.linechart-legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 10px; }
+.inv-holding-row { cursor: pointer; }
+.inv-holding-row:hover { background: rgba(255,255,255,.03); }
+.inv-detail-row td { padding: 16px; background: rgba(255,255,255,.02); }
+.inv-ticker-detail .section-title { margin-top: 0; }
 
 /* Toggle tipo (gasto/ingreso) en alta manual */
 .type-toggle { display: flex; gap: 6px; margin-bottom: 16px; }

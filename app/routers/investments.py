@@ -5,7 +5,7 @@ Precios de cripto vía CoinGecko (USD), convertidos a ARS con el dólar blue.
 Acciones AR no tienen fuente gratuita confiable: usan último precio conocido
 (carga manual) y, en su defecto, el costo promedio como fallback neutro.
 """
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
@@ -16,7 +16,13 @@ from ..database import get_db
 from ..models import User, Investment, InvestmentTransaction, InvestmentPrice
 from ..security import get_current_user
 from ..services.investment_parser import parse_file
-from ..services.investment_calculator import calculate_weighted_avg_cost, calculate_concentration_flags
+from ..services.investment_calculator import (
+    calculate_weighted_avg_cost,
+    calculate_concentration_flags,
+    calculate_realized_position,
+    calculate_diversification_score,
+    find_price_at_or_before,
+)
 from ..services import prices as price_svc
 
 router = APIRouter(prefix="/api/investments", tags=["investments"])
@@ -62,6 +68,7 @@ class SummaryResponse(BaseModel):
     by_type: dict = {}
     risk_flags: list[dict] = []
     benchmark: Optional[dict] = None
+    diversification_score: Optional[float] = None
 
 
 class UploadResponse(BaseModel):
@@ -86,6 +93,45 @@ class RefreshResponse(BaseModel):
     ok: bool
     updated: int
     blue_rate: Optional[float] = None
+
+
+class ClosedPositionResponse(BaseModel):
+    ticker: str
+    broker: str
+    asset_type: str
+    currency: str
+    status: str            # "closed" (vendida del todo) | "open" (venta parcial)
+    realized_pnl: float
+    realized_pnl_ars: float
+    total_bought_qty: float
+    total_sold_qty: float
+    avg_buy_price: float
+    avg_sell_price: float
+    first_date: Optional[str]
+    last_date: Optional[str]
+
+
+class TimelinePoint(BaseModel):
+    date: str
+    market_value: float
+    cost_basis: float
+
+
+class TimelineResponse(BaseModel):
+    points: list[TimelinePoint]
+    currency: str
+
+
+class PriceHistoryPoint(BaseModel):
+    date: str
+    price: float
+
+
+class TickerDetailResponse(BaseModel):
+    ticker: str
+    price_history: list[PriceHistoryPoint]
+    transactions: list[HistoryItem]
+    currency: str
 
 
 # ─── Helpers de persistencia ──────────────────────────────────────────────
@@ -177,17 +223,62 @@ def _current_price(inv: Investment, price_rec: Optional[InvestmentPrice], blue: 
     return p, True
 
 
+def _tx_dicts(txs: list[InvestmentTransaction]) -> list[dict]:
+    """Ordena por (fecha, id) y convierte a dicts para las funciones puras del calculator."""
+    ordered = sorted(txs, key=lambda t: (t.date, t.id))
+    return [{"tx_type": t.tx_type, "quantity": t.quantity, "price": t.price, "date": t.date} for t in ordered]
+
+
 def _realized_pnl(txs: list[InvestmentTransaction]) -> float:
     """P&L realizado replayando las transacciones con costo promedio ponderado."""
-    qty, avg, realized = 0.0, 0.0, 0.0
-    for tx in sorted(txs, key=lambda t: (t.date, t.id)):
+    if not txs:
+        return 0.0
+    return calculate_realized_position(_tx_dicts(txs))["realized_pnl"]
+
+
+def _sample_dates(start: date, end: date) -> list[date]:
+    """Fechas de muestreo para la línea de tiempo, con resolución acotada según el
+    rango total: diaria (<=60d), semanal (<=1 año), mensual (<=3 años), trimestral
+    si es más largo. Siempre incluye `end` como último punto."""
+    span = (end - start).days
+    if span <= 0:
+        return [end]
+    if span <= 60:
+        step = 1
+    elif span <= 365:
+        step = 7
+    elif span <= 365 * 3:
+        step = 30
+    else:
+        step = 90
+
+    dates = []
+    d = start
+    while d < end:
+        dates.append(d)
+        d += timedelta(days=step)
+    dates.append(end)
+    return dates
+
+
+def _positions_at_date(all_txs: list[InvestmentTransaction], as_of: date) -> dict:
+    """Para cada (ticker, broker), qty/avg_cost replayando transacciones hasta `as_of`
+    (inclusive), con costo promedio ponderado."""
+    positions: dict[tuple, dict] = {}
+    for tx in sorted(all_txs, key=lambda t: (t.date, t.id)):
+        if tx.date > as_of:
+            continue
+        key = (tx.ticker, tx.broker)
+        pos = positions.setdefault(key, {
+            "qty": 0.0, "avg_cost": 0.0,
+            "currency": tx.currency or "ARS", "asset_type": tx.asset_type or "stock",
+        })
         if tx.tx_type == "buy":
-            avg = calculate_weighted_avg_cost(qty, avg, tx.quantity, tx.price)
-            qty += tx.quantity
-        else:  # sell
-            realized += (tx.price - avg) * tx.quantity
-            qty = max(0.0, qty - tx.quantity)
-    return realized
+            pos["avg_cost"] = calculate_weighted_avg_cost(pos["qty"], pos["avg_cost"], tx.quantity, tx.price)
+            pos["qty"] += tx.quantity
+        else:
+            pos["qty"] = max(0.0, pos["qty"] - tx.quantity)
+    return positions
 
 
 async def _maybe_blue() -> Optional[float]:
@@ -431,6 +522,7 @@ async def get_summary(
     total_unrealized = total_current_value - total_invested
     total_pnl = total_unrealized + realized
     risk_flags = calculate_concentration_flags(holding_values)
+    diversification_score = calculate_diversification_score(holding_values)
 
     benchmark = None
     earliest_tx_date = min((t.date for t in all_txs), default=None)
@@ -460,4 +552,138 @@ async def get_summary(
         by_type=by_type,
         risk_flags=risk_flags,
         benchmark=benchmark,
+        diversification_score=diversification_score,
+    )
+
+
+@router.get("/closed", response_model=list[ClosedPositionResponse])
+async def get_closed_positions(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[ClosedPositionResponse]:
+    """Detalle de P&L realizado por posición vendida (total o parcialmente), no
+    sólo el agregado de /summary."""
+    all_invs = db.query(Investment).filter(Investment.user_id == user.id).all()
+    all_txs = db.query(InvestmentTransaction).filter(
+        InvestmentTransaction.user_id == user.id
+    ).all()
+
+    txs_by_inv: dict = {}
+    for tx in all_txs:
+        txs_by_inv.setdefault(tx.investment_id, []).append(tx)
+
+    needs_blue = any(
+        (inv.currency or "ARS") == "USD" for inv in all_invs if txs_by_inv.get(inv.id)
+    )
+    blue = await _maybe_blue() if needs_blue else None
+
+    result = []
+    for inv in all_invs:
+        txs = txs_by_inv.get(inv.id, [])
+        if not any(t.tx_type == "sell" for t in txs):
+            continue
+        detail = calculate_realized_position(_tx_dicts(txs))
+        result.append(ClosedPositionResponse(
+            ticker=inv.ticker, broker=inv.broker,
+            asset_type=inv.asset_type or "stock", currency=inv.currency or "ARS",
+            status=inv.status,
+            realized_pnl=detail["realized_pnl"],
+            realized_pnl_ars=_to_ars(detail["realized_pnl"], inv.currency or "ARS", blue),
+            total_bought_qty=detail["total_bought_qty"],
+            total_sold_qty=detail["total_sold_qty"],
+            avg_buy_price=detail["avg_buy_price"],
+            avg_sell_price=detail["avg_sell_price"],
+            first_date=detail["first_date"],
+            last_date=detail["last_date"],
+        ))
+    result.sort(key=lambda r: r.last_date or "", reverse=True)
+    return result
+
+
+@router.get("/timeline", response_model=TimelineResponse)
+async def get_timeline(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> TimelineResponse:
+    """Evolución de la cartera en el tiempo: valor de mercado (mark-to-market con
+    precios históricos reales por ticker) y costo invertido acumulado (cost-basis),
+    ambos en ARS. Resolución de muestreo acotada según el rango total; cada ticker
+    se trae UNA sola vez (no por punto de muestreo)."""
+    all_txs = db.query(InvestmentTransaction).filter(
+        InvestmentTransaction.user_id == user.id
+    ).all()
+    if not all_txs:
+        return TimelineResponse(points=[], currency="ARS")
+
+    start = min(t.date for t in all_txs)
+    today = date.today()
+    sample_dates = _sample_dates(start, today)
+
+    needs_blue = any((t.currency or "ARS") == "USD" for t in all_txs)
+    blue = await _maybe_blue() if needs_blue else None
+
+    tickers = {(t.ticker, t.asset_type or "stock", t.currency or "ARS") for t in all_txs}
+    history_by_ticker: dict[str, list[dict]] = {}
+    for ticker, asset_type, currency in tickers:
+        try:
+            history_by_ticker[ticker] = await price_svc.fetch_price_history(
+                ticker, asset_type, currency, start
+            )
+        except Exception:
+            history_by_ticker[ticker] = []
+
+    points = []
+    for d in sample_dates:
+        positions = _positions_at_date(all_txs, d)
+        cost_basis = 0.0
+        market_value = 0.0
+        for (ticker, _broker), pos in positions.items():
+            if pos["qty"] <= 0:
+                continue
+            cost_basis += _to_ars(pos["qty"] * pos["avg_cost"], pos["currency"], blue)
+            price = find_price_at_or_before(history_by_ticker.get(ticker, []), d)
+            if price is None:
+                price = pos["avg_cost"]
+            market_value += _to_ars(pos["qty"] * price, pos["currency"], blue)
+        points.append(TimelinePoint(date=str(d), market_value=market_value, cost_basis=cost_basis))
+
+    return TimelineResponse(points=points, currency="ARS")
+
+
+@router.get("/price-history/{ticker}", response_model=TickerDetailResponse)
+async def get_ticker_detail(
+    ticker: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> TickerDetailResponse:
+    """Detalle de un activo para el desplegable de la tabla de holdings: histórico
+    de precio (Yahoo Finance) + el historial de transacciones propias del usuario
+    para ese ticker."""
+    ticker = ticker.strip().upper()
+    txs = db.query(InvestmentTransaction).filter(
+        and_(InvestmentTransaction.user_id == user.id, InvestmentTransaction.ticker == ticker)
+    ).order_by(InvestmentTransaction.date.desc()).all()
+    if not txs:
+        raise HTTPException(404, "No hay transacciones para ese ticker")
+
+    asset_type = txs[0].asset_type or price_svc.infer_asset_type(ticker)
+    currency = txs[0].currency or "ARS"
+    earliest = min(t.date for t in txs)
+
+    history = await price_svc.fetch_price_history(ticker, asset_type, currency, earliest)
+
+    return TickerDetailResponse(
+        ticker=ticker,
+        price_history=[
+            PriceHistoryPoint(date=str(p["date"]), price=p["price"]) for p in history
+        ],
+        transactions=[
+            HistoryItem(
+                date=str(tx.date), ticker=tx.ticker, type=tx.tx_type,
+                quantity=tx.quantity, price=tx.price, broker=tx.broker,
+                asset_type=tx.asset_type or "stock", total=tx.quantity * tx.price,
+            )
+            for tx in txs
+        ],
+        currency=currency,
     )

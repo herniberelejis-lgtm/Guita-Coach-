@@ -17,7 +17,8 @@ Supports:
 - Edge cases (zero quantities, zero prices, large numbers)
 """
 
-from typing import List, TypedDict
+import statistics
+from typing import List, Optional, TypedDict
 
 
 class Holding(TypedDict):
@@ -158,6 +159,134 @@ def calculate_concentration_flags(
     ]
     flags.sort(key=lambda f: f["pct"], reverse=True)
     return flags
+
+
+def calculate_realized_position(transactions: List[dict]) -> dict:
+    """
+    Replays a position's full buy/sell history (weighted-average cost) to produce
+    a detailed breakdown, used for the closed-positions view.
+
+    Args:
+        transactions: list of dicts with keys: tx_type ("buy"|"sell"), quantity,
+            price, date (date or ISO string). Order does not matter, they are
+            sorted internally by date.
+
+    Returns:
+        Dict with: realized_pnl, total_bought_qty, total_sold_qty, avg_buy_price,
+        avg_sell_price, first_date, last_date (ISO strings, None if no transactions).
+    """
+    if not transactions:
+        return {
+            "realized_pnl": 0.0,
+            "total_bought_qty": 0.0,
+            "total_sold_qty": 0.0,
+            "avg_buy_price": 0.0,
+            "avg_sell_price": 0.0,
+            "first_date": None,
+            "last_date": None,
+        }
+
+    txs = sorted(transactions, key=lambda t: str(t["date"]))
+    qty = avg = realized = 0.0
+    total_bought_qty = total_bought_cost = 0.0
+    total_sold_qty = total_sold_revenue = 0.0
+
+    for t in txs:
+        if t["tx_type"] == "buy":
+            avg = calculate_weighted_avg_cost(qty, avg, t["quantity"], t["price"])
+            qty += t["quantity"]
+            total_bought_qty += t["quantity"]
+            total_bought_cost += t["quantity"] * t["price"]
+        else:
+            realized += (t["price"] - avg) * t["quantity"]
+            qty = max(0.0, qty - t["quantity"])
+            total_sold_qty += t["quantity"]
+            total_sold_revenue += t["quantity"] * t["price"]
+
+    return {
+        "realized_pnl": realized,
+        "total_bought_qty": total_bought_qty,
+        "total_sold_qty": total_sold_qty,
+        "avg_buy_price": (total_bought_cost / total_bought_qty) if total_bought_qty else 0.0,
+        "avg_sell_price": (total_sold_revenue / total_sold_qty) if total_sold_qty else 0.0,
+        "first_date": str(txs[0]["date"]),
+        "last_date": str(txs[-1]["date"]),
+    }
+
+
+def calculate_volatility_pct(values: List[float]) -> Optional[float]:
+    """
+    Volatility of a value series, as the population stdev of period-over-period
+    % returns. None if there are fewer than 2 valid (non-zero-base) returns.
+    """
+    returns = []
+    for prev, curr in zip(values, values[1:]):
+        if prev > 0:
+            returns.append((curr - prev) / prev * 100)
+    if len(returns) < 2:
+        return None
+    return statistics.pstdev(returns)
+
+
+def calculate_max_drawdown_pct(values: List[float]) -> Optional[float]:
+    """
+    Largest peak-to-trough decline (%) observed across a value series.
+    None if there are fewer than 2 points.
+    """
+    if len(values) < 2:
+        return None
+    peak = values[0]
+    max_dd = 0.0
+    for v in values:
+        peak = max(peak, v)
+        if peak > 0:
+            max_dd = max(max_dd, (peak - v) / peak * 100)
+    return max_dd
+
+
+def calculate_diversification_score(holdings: List[dict]) -> Optional[float]:
+    """
+    Diversification score (0-100) from the inverse Herfindahl-Hirschman Index of
+    each holding's share of total current_value. 100 = perfectly even split across
+    all holdings, 0 = a single holding takes the whole portfolio.
+
+    Args:
+        holdings: list of dicts with key: current_value
+
+    Returns:
+        Score in [0, 100], or None if portfolio has no value or only one holding.
+    """
+    total = sum(h.get("current_value", 0.0) for h in holdings)
+    if total <= 0:
+        return None
+    n = len(holdings)
+    if n <= 1:
+        return 0.0
+    hhi = sum((h.get("current_value", 0.0) / total) ** 2 for h in holdings)
+    min_hhi = 1.0 / n
+    score = (1 - hhi) / (1 - min_hhi) * 100
+    return max(0.0, min(100.0, score))
+
+
+def find_price_at_or_before(history: List[dict], target_date) -> Optional[float]:
+    """
+    Forward-fill lookup: returns the price of the latest entry in `history` whose
+    date is <= target_date.
+
+    Args:
+        history: ascending list of dicts with keys: date, price
+        target_date: date to look up
+
+    Returns:
+        The forward-filled price, or None if no entry has date <= target_date.
+    """
+    result = None
+    for point in history:
+        if point["date"] <= target_date:
+            result = point["price"]
+        else:
+            break
+    return result
 
 
 def calculate_portfolio_summary(

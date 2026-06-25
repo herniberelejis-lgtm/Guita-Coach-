@@ -45,11 +45,17 @@ const Investments = {
     const riskWrap = document.createElement('div');
     page.appendChild(riskWrap);
 
+    const timelineWrap = document.createElement('div');
+    page.appendChild(timelineWrap);
+
     const chartsWrap = document.createElement('div');
     page.appendChild(chartsWrap);
 
     const holdingsBlock = this._block('Posiciones abiertas');
     page.appendChild(holdingsBlock.block);
+
+    const closedBlock = this._block('Posiciones cerradas');
+    page.appendChild(closedBlock.block);
 
     page.appendChild(this._buildManualAndUpload());
 
@@ -57,16 +63,20 @@ const Investments = {
     page.appendChild(historyBlock.block);
 
     // Cargar datos en paralelo
-    const [summary, holdings, history] = await Promise.all([
+    const [summary, holdings, history, timeline, closed] = await Promise.all([
       API.getInvestmentSummary().catch(() => null),
       API.getInvestmentHoldings().catch(() => []),
       API.getInvestmentHistory().catch(() => []),
+      API.getInvestmentTimeline().catch(() => null),
+      API.getInvestmentClosed().catch(() => []),
     ]);
 
     this._renderSummary(summaryWrap, summary);
     this._renderRisk(riskWrap, summary);
+    this._renderTimeline(timelineWrap, timeline);
     this._renderCharts(chartsWrap, holdings, summary);
     this._renderHoldings(holdingsBlock.body, holdings);
+    this._renderClosed(closedBlock.body, closed);
     this._renderHistory(historyBlock.body, history);
   },
 
@@ -154,6 +164,13 @@ const Investments = {
         text: `Tu cartera rindió ${fmtPct(b.portfolio_return_pct)} desde ${b.since}, vs ${fmtPct(b.benchmark_return_pct)} del ${b.name} en el mismo período.`,
       });
     }
+    if (s.diversification_score != null && (s.holdings_count || 0) > 1) {
+      const score = Math.round(s.diversification_score);
+      items.push({
+        cls: score < 40 ? 'warning' : 'info',
+        text: `Score de diversificación: ${score}/100 (100 = repartida en partes iguales entre tus activos, 0 = concentrada en uno solo).`,
+      });
+    }
     if (!items.length) return;
 
     items.forEach(it => {
@@ -169,6 +186,163 @@ const Investments = {
       div.appendChild(msg);
       wrap.appendChild(div);
     });
+  },
+
+  _renderTimeline(wrap, timeline) {
+    wrap.textContent = '';
+    if (!timeline || !timeline.points || timeline.points.length < 2) return;
+    const block = document.createElement('div');
+    block.className = 'inv-block';
+    const t = document.createElement('p');
+    t.className = 'section-title';
+    t.textContent = 'Evolución de la cartera';
+    block.appendChild(t);
+    const series = [
+      { label: 'Valor de mercado', color: '#5B8DEF', points: timeline.points.map(p => ({ x: p.date, y: p.market_value })) },
+      { label: 'Invertido (costo)', color: '#84A98C', points: timeline.points.map(p => ({ x: p.date, y: p.cost_basis })) },
+    ];
+    block.appendChild(this._lineChart(series));
+    const hint = document.createElement('p');
+    hint.className = 'inv-pricehint';
+    hint.textContent = `Desde ${timeline.points[0].date} hasta ${timeline.points[timeline.points.length - 1].date}, valores en ${timeline.currency}.`;
+    block.appendChild(hint);
+    wrap.appendChild(block);
+  },
+
+  _compactMoney(v) {
+    const abs = Math.abs(v);
+    if (abs >= 1e6) return (v / 1e6).toFixed(1) + 'M';
+    if (abs >= 1e3) return (v / 1e3).toFixed(0) + 'k';
+    return Math.round(v).toString();
+  },
+
+  _lineChart(series) {
+    const W = 600, H = 220, padL = 42, padR = 10, padT = 10, padB = 24;
+    const wrap = document.createElement('div');
+    wrap.className = 'linechart-wrap';
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('class', 'linechart');
+    svg.setAttribute('preserveAspectRatio', 'none');
+
+    const allYs = series.flatMap(s => s.points.map(p => p.y));
+    let maxY = Math.max(...allYs, 0);
+    let minY = Math.min(...allYs, 0);
+    if (maxY === minY) maxY = minY + 1;
+    const n = series[0] ? series[0].points.length : 0;
+    const innerW = W - padL - padR;
+    const innerH = H - padT - padB;
+    const xAt = i => padL + (n > 1 ? (i / (n - 1)) * innerW : innerW / 2);
+    const yAt = v => padT + innerH - ((v - minY) / (maxY - minY)) * innerH;
+
+    [0, 0.5, 1].forEach(f => {
+      const y = padT + innerH * f;
+      const line = document.createElementNS(svgNS, 'line');
+      line.setAttribute('x1', String(padL)); line.setAttribute('x2', String(W - padR));
+      line.setAttribute('y1', String(y)); line.setAttribute('y2', String(y));
+      line.setAttribute('class', 'linechart-grid');
+      svg.appendChild(line);
+      const val = maxY - (maxY - minY) * f;
+      const txt = document.createElementNS(svgNS, 'text');
+      txt.setAttribute('x', '2'); txt.setAttribute('y', String(y + 3));
+      txt.setAttribute('class', 'linechart-axis');
+      txt.textContent = this._compactMoney(val);
+      svg.appendChild(txt);
+    });
+
+    series.forEach(s => {
+      const pts = s.points.map((p, i) => `${xAt(i)},${yAt(p.y)}`).join(' ');
+      const poly = document.createElementNS(svgNS, 'polyline');
+      poly.setAttribute('points', pts);
+      poly.setAttribute('fill', 'none');
+      poly.setAttribute('stroke', s.color);
+      poly.setAttribute('stroke-width', '2');
+      svg.appendChild(poly);
+    });
+
+    wrap.appendChild(svg);
+
+    const legend = document.createElement('div');
+    legend.className = 'linechart-legend';
+    series.forEach(s => {
+      const last = s.points[s.points.length - 1];
+      const row = document.createElement('div');
+      row.className = 'legend-item';
+      const dot = document.createElement('span');
+      dot.className = 'legend-dot';
+      dot.style.background = s.color;
+      const label = document.createElement('span');
+      label.textContent = `${s.label}: ${App.fmt(last ? last.y : 0)}`;
+      row.appendChild(dot);
+      row.appendChild(label);
+      legend.appendChild(row);
+    });
+    wrap.appendChild(legend);
+    return wrap;
+  },
+
+  _renderClosed(body, closed) {
+    body.textContent = '';
+    if (!closed || !closed.length) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = 'Sin posiciones cerradas todavía';
+      body.appendChild(empty);
+      return;
+    }
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const hr = document.createElement('tr');
+    ['Activo', 'Estado', 'Compra prom.', 'Venta prom.', 'P&L realizado', 'Período'].forEach((h, i) => {
+      const th = document.createElement('th');
+      th.textContent = h;
+      if (i >= 2 && i <= 4) th.style.textAlign = 'right';
+      hr.appendChild(th);
+    });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    closed.forEach(c => {
+      const tr = document.createElement('tr');
+      const cls = c.realized_pnl >= 0 ? 'gain' : 'loss';
+
+      const tickerCell = document.createElement('td');
+      const strong = document.createElement('strong');
+      strong.textContent = c.ticker;
+      tickerCell.appendChild(strong);
+      tr.appendChild(tickerCell);
+
+      const statusTd = document.createElement('td');
+      statusTd.textContent = c.status === 'closed' ? 'Cerrada' : 'Venta parcial';
+      tr.appendChild(statusTd);
+
+      [this._money(c.avg_buy_price, c.currency), this._money(c.avg_sell_price, c.currency)].forEach(text => {
+        const td = document.createElement('td');
+        td.style.textAlign = 'right';
+        td.textContent = text;
+        tr.appendChild(td);
+      });
+
+      const pnlTd = document.createElement('td');
+      pnlTd.style.textAlign = 'right';
+      pnlTd.style.color = `var(--${cls === 'gain' ? 'ok' : 'danger'})`;
+      let pnlText = (c.realized_pnl >= 0 ? '+' : '') + this._money(c.realized_pnl, c.currency);
+      if (c.currency === 'USD') {
+        pnlText += ` (${(c.realized_pnl_ars >= 0 ? '+' : '') + App.fmt(c.realized_pnl_ars)})`;
+      }
+      pnlTd.textContent = pnlText;
+      tr.appendChild(pnlTd);
+
+      const periodTd = document.createElement('td');
+      periodTd.textContent = `${c.first_date || '?'} → ${c.last_date || '?'}`;
+      tr.appendChild(periodTd);
+
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    body.appendChild(table);
   },
 
   _renderCharts(wrap, holdings, summary) {
@@ -286,6 +460,7 @@ const Investments = {
     const tbody = document.createElement('tbody');
     holdings.forEach(h => {
       const tr = document.createElement('tr');
+      tr.className = 'inv-holding-row';
       const cls = h.pnl >= 0 ? 'gain' : 'loss';
 
       const tickerCell = document.createElement('td');
@@ -331,9 +506,55 @@ const Investments = {
       tr.appendChild(pctTd);
 
       tbody.appendChild(tr);
+
+      const detailTr = document.createElement('tr');
+      detailTr.className = 'inv-detail-row';
+      detailTr.style.display = 'none';
+      const detailTd = document.createElement('td');
+      detailTd.colSpan = 7;
+      detailTr.appendChild(detailTd);
+      tbody.appendChild(detailTr);
+
+      let loaded = false;
+      tr.addEventListener('click', async () => {
+        const isOpen = detailTr.style.display !== 'none';
+        if (isOpen) { detailTr.style.display = 'none'; return; }
+        detailTr.style.display = '';
+        if (loaded) return;
+        loaded = true;
+        detailTd.textContent = 'Cargando…';
+        try {
+          const detail = await API.getInvestmentTickerDetail(h.ticker);
+          this._renderTickerDetail(detailTd, detail);
+        } catch (err) {
+          detailTd.textContent = 'No se pudo cargar el detalle: ' + err.message;
+        }
+      });
     });
     table.appendChild(tbody);
     body.appendChild(table);
+  },
+
+  _renderTickerDetail(td, detail) {
+    td.textContent = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'inv-ticker-detail';
+    if (detail.price_history && detail.price_history.length >= 2) {
+      const series = [{
+        label: detail.ticker + ' · precio',
+        color: '#C97B4A',
+        points: detail.price_history.map(p => ({ x: p.date, y: p.price })),
+      }];
+      wrap.appendChild(this._lineChart(series));
+    }
+    const txTitle = document.createElement('p');
+    txTitle.style.cssText = 'font-size:.8rem;color:var(--muted);margin:12px 0 8px;';
+    txTitle.textContent = 'Tus movimientos en ' + detail.ticker;
+    wrap.appendChild(txTitle);
+    const histBody = document.createElement('div');
+    this._renderHistory(histBody, detail.transactions);
+    wrap.appendChild(histBody);
+    td.appendChild(wrap);
   },
 
   _renderHistory(body, history) {

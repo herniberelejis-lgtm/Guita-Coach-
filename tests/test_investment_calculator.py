@@ -8,12 +8,18 @@ Uses TDD approach:
 """
 
 import pytest
+from datetime import date
 from app.services.investment_calculator import (
     calculate_weighted_avg_cost,
     calculate_pnl_unrealized,
     calculate_pnl_realized,
     calculate_portfolio_summary,
     calculate_concentration_flags,
+    calculate_realized_position,
+    calculate_volatility_pct,
+    calculate_max_drawdown_pct,
+    calculate_diversification_score,
+    find_price_at_or_before,
 )
 
 
@@ -666,3 +672,162 @@ class TestEdgeCasesAndValidation:
         ]
         result = calculate_portfolio_summary(holdings)
         assert result["total_pnl"] > 0
+
+
+class TestRealizedPosition:
+    """Test calculate_realized_position (closed-position detail breakdown)."""
+
+    def test_no_transactions(self):
+        result = calculate_realized_position([])
+        assert result["realized_pnl"] == 0.0
+        assert result["first_date"] is None
+        assert result["last_date"] is None
+
+    def test_single_buy_then_full_sell_profit(self):
+        txs = [
+            {"tx_type": "buy", "quantity": 10, "price": 100.0, "date": date(2026, 1, 1)},
+            {"tx_type": "sell", "quantity": 10, "price": 120.0, "date": date(2026, 2, 1)},
+        ]
+        result = calculate_realized_position(txs)
+        assert result["realized_pnl"] == pytest.approx(200.0)
+        assert result["total_bought_qty"] == 10
+        assert result["total_sold_qty"] == 10
+        assert result["avg_buy_price"] == pytest.approx(100.0)
+        assert result["avg_sell_price"] == pytest.approx(120.0)
+        assert result["first_date"] == "2026-01-01"
+        assert result["last_date"] == "2026-02-01"
+
+    def test_multiple_buys_weighted_avg_then_sell(self):
+        txs = [
+            {"tx_type": "buy", "quantity": 10, "price": 100.0, "date": date(2026, 1, 1)},
+            {"tx_type": "buy", "quantity": 10, "price": 120.0, "date": date(2026, 1, 15)},
+            {"tx_type": "sell", "quantity": 20, "price": 130.0, "date": date(2026, 2, 1)},
+        ]
+        result = calculate_realized_position(txs)
+        # weighted avg cost = (10*100 + 10*120)/20 = 110
+        assert result["avg_buy_price"] == pytest.approx(110.0)
+        assert result["realized_pnl"] == pytest.approx((130.0 - 110.0) * 20)
+
+    def test_unsorted_input_is_sorted_by_date(self):
+        txs = [
+            {"tx_type": "sell", "quantity": 5, "price": 120.0, "date": date(2026, 2, 1)},
+            {"tx_type": "buy", "quantity": 5, "price": 100.0, "date": date(2026, 1, 1)},
+        ]
+        result = calculate_realized_position(txs)
+        assert result["realized_pnl"] == pytest.approx(100.0)
+        assert result["first_date"] == "2026-01-01"
+        assert result["last_date"] == "2026-02-01"
+
+    def test_loss_sale(self):
+        txs = [
+            {"tx_type": "buy", "quantity": 10, "price": 100.0, "date": date(2026, 1, 1)},
+            {"tx_type": "sell", "quantity": 10, "price": 80.0, "date": date(2026, 2, 1)},
+        ]
+        result = calculate_realized_position(txs)
+        assert result["realized_pnl"] == pytest.approx(-200.0)
+
+
+class TestVolatility:
+    """Test calculate_volatility_pct."""
+
+    def test_too_few_points_returns_none(self):
+        assert calculate_volatility_pct([100.0]) is None
+        assert calculate_volatility_pct([]) is None
+
+    def test_flat_series_zero_volatility(self):
+        result = calculate_volatility_pct([100.0, 100.0, 100.0, 100.0])
+        assert result == pytest.approx(0.0)
+
+    def test_volatile_series_positive(self):
+        result = calculate_volatility_pct([100.0, 150.0, 80.0, 140.0, 90.0])
+        assert result > 0
+
+    def test_steady_growth_lower_volatility_than_choppy(self):
+        steady = calculate_volatility_pct([100.0, 105.0, 110.0, 115.0, 120.0])
+        choppy = calculate_volatility_pct([100.0, 150.0, 90.0, 140.0, 95.0])
+        assert steady < choppy
+
+    def test_zero_base_values_are_skipped(self):
+        # First transition from 0 has no valid % return and is skipped
+        result = calculate_volatility_pct([0.0, 100.0, 110.0, 90.0])
+        assert result is not None
+
+
+class TestMaxDrawdown:
+    """Test calculate_max_drawdown_pct."""
+
+    def test_too_few_points_returns_none(self):
+        assert calculate_max_drawdown_pct([100.0]) is None
+
+    def test_monotonic_increase_zero_drawdown(self):
+        result = calculate_max_drawdown_pct([100.0, 110.0, 120.0, 130.0])
+        assert result == pytest.approx(0.0)
+
+    def test_simple_drawdown(self):
+        result = calculate_max_drawdown_pct([100.0, 200.0, 100.0])
+        assert result == pytest.approx(50.0)
+
+    def test_recovers_then_drops_again_picks_worst(self):
+        result = calculate_max_drawdown_pct([100.0, 200.0, 150.0, 250.0, 50.0])
+        # worst drawdown is from peak 250 to 50 = 80%
+        assert result == pytest.approx(80.0)
+
+
+class TestDiversificationScore:
+    """Test calculate_diversification_score."""
+
+    def test_empty_portfolio_none(self):
+        assert calculate_diversification_score([]) is None
+
+    def test_zero_value_portfolio_none(self):
+        assert calculate_diversification_score([{"current_value": 0.0}]) is None
+
+    def test_single_holding_zero_score(self):
+        result = calculate_diversification_score([{"current_value": 1000.0}])
+        assert result == pytest.approx(0.0)
+
+    def test_evenly_split_holdings_max_score(self):
+        holdings = [{"current_value": 100.0} for _ in range(4)]
+        result = calculate_diversification_score(holdings)
+        assert result == pytest.approx(100.0)
+
+    def test_concentrated_portfolio_lower_score_than_balanced(self):
+        concentrated = calculate_diversification_score([
+            {"current_value": 900.0}, {"current_value": 100.0},
+        ])
+        balanced = calculate_diversification_score([
+            {"current_value": 500.0}, {"current_value": 500.0},
+        ])
+        assert concentrated < balanced
+
+
+class TestFindPriceAtOrBefore:
+    """Test find_price_at_or_before (forward-fill lookup)."""
+
+    def test_empty_history_returns_none(self):
+        assert find_price_at_or_before([], date(2026, 1, 1)) is None
+
+    def test_target_before_first_entry_returns_none(self):
+        history = [{"date": date(2026, 1, 10), "price": 100.0}]
+        assert find_price_at_or_before(history, date(2026, 1, 1)) is None
+
+    def test_exact_match(self):
+        history = [
+            {"date": date(2026, 1, 1), "price": 100.0},
+            {"date": date(2026, 1, 5), "price": 105.0},
+        ]
+        assert find_price_at_or_before(history, date(2026, 1, 5)) == 105.0
+
+    def test_forward_fills_between_entries(self):
+        history = [
+            {"date": date(2026, 1, 1), "price": 100.0},
+            {"date": date(2026, 1, 10), "price": 110.0},
+        ]
+        assert find_price_at_or_before(history, date(2026, 1, 5)) == 100.0
+
+    def test_returns_last_entry_when_target_after_all(self):
+        history = [
+            {"date": date(2026, 1, 1), "price": 100.0},
+            {"date": date(2026, 1, 10), "price": 110.0},
+        ]
+        assert find_price_at_or_before(history, date(2026, 6, 1)) == 110.0

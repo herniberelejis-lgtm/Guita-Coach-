@@ -38,9 +38,13 @@ YAHOO_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
 _YAHOO_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; GuitaCoach/1.0)"}
 
 CACHE_TTL_SECONDS = 180  # 3 minutos
+HISTORY_CACHE_TTL_SECONDS = 6 * 3600  # 6 horas — el pasado no cambia, solo agrega la barra de hoy
 
 # Cache en memoria: {ticker: {"price": float, "currency": str, "ts": float}}
 _QUOTE_CACHE: dict[str, dict] = {}
+
+# Cache en memoria de series históricas: {"{symbol}_{since_iso}": {"data": [...], "ts": float}}
+_HISTORY_CACHE: dict[str, dict] = {}
 
 
 def normalize_ticker(ticker: str) -> str:
@@ -208,6 +212,55 @@ async def fetch_benchmark_return_pct(symbol: str, since_date) -> Optional[float]
     except Exception:
         return None
     return (current_price - start_price) / start_price * 100
+
+
+async def fetch_price_history(ticker: str, asset_type: str, currency: str, since) -> list[dict]:
+    """Serie histórica de precios de cierre diario (o semanal si el rango es muy
+    largo) desde `since` hasta hoy, vía Yahoo Finance. [] ante error o sin datos.
+
+    Devuelve [{"date": date, "price": float}, ...] ascendente, en la moneda nativa
+    del símbolo (igual criterio que fetch_prices/yahoo_symbol).
+
+    Cacheado por (símbolo, since) con TTL largo: los precios de días pasados no
+    cambian, solo se agrega la barra de hoy.
+    """
+    import datetime as _dt
+    if isinstance(since, str):
+        since = _dt.date.fromisoformat(since)
+
+    symbol = yahoo_symbol(ticker, asset_type, currency)
+    cache_key = f"{symbol}_{since.isoformat()}"
+    now = time.time()
+    cached = _HISTORY_CACHE.get(cache_key)
+    if cached and (now - cached["ts"]) < HISTORY_CACHE_TTL_SECONDS:
+        return cached["data"]
+
+    period1 = int(_dt.datetime.combine(since, _dt.time()).timestamp())
+    period2 = int(_dt.datetime.now().timestamp())
+    span_days = (_dt.date.today() - since).days
+    interval = "1d" if span_days <= 400 else "1wk"
+
+    try:
+        async with httpx.AsyncClient(timeout=12) as client:
+            r = await client.get(
+                YAHOO_URL.format(symbol=symbol),
+                headers=_YAHOO_HEADERS,
+                params={"period1": period1, "period2": period2, "interval": interval},
+            )
+            r.raise_for_status()
+            result = r.json()["chart"]["result"][0]
+            timestamps = result.get("timestamp") or []
+            closes = result["indicators"]["quote"][0]["close"]
+    except Exception:
+        return []
+
+    points = [
+        {"date": _dt.date.fromtimestamp(ts), "price": float(close)}
+        for ts, close in zip(timestamps, closes)
+        if close is not None
+    ]
+    _HISTORY_CACHE[cache_key] = {"data": points, "ts": now}
+    return points
 
 
 async def fetch_blue_rate() -> Optional[float]:
