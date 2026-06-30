@@ -78,6 +78,9 @@ const API = {
   getPlaidLinkToken: () => API.post('/sync/plaid/link_token', {}),
   exchangePlaidToken: (public_token) => API.post('/sync/plaid/exchange_token', { public_token }),
   syncPlaidTransactions: () => API.post('/sync/plaid/sync', {}),
+  createPrometeoConnector: () => API.post('/sync/prometeo/connector', {}),
+  authorizePrometeo: (connector_id) => API.post('/sync/prometeo/authorize', { connector_id }),
+  syncPrometeoTransactions: () => API.post('/sync/prometeo/sync', {}),
 
   // Auth
   register: (d) => API.post('/auth/register', d),

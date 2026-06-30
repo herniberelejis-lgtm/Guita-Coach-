@@ -57,6 +57,11 @@ const Settings = {
     const plaidConnected = plaidStatus?.status === 'connected';
     main.appendChild(this._buildPlaidCard(plaidConnected, plaidStatus?.last_sync));
 
+    // ── Prometeo (Open Banking - Argentina) ──────────────────────────────────
+    const prometeoStatus = syncStatus['prometeo'];
+    const prometeoConnected = prometeoStatus?.status === 'connected';
+    main.appendChild(this._buildPrometeoCard(prometeoConnected, prometeoStatus?.last_sync));
+
     // ── Import CSV de MP ─────────────────────────────────────────────────────
     main.appendChild(this._buildCsvImportCard());
 
@@ -326,6 +331,108 @@ const Settings = {
     });
 
     handler.open();
+  },
+
+  _buildPrometeoCard(connected, lastSync) {
+    const card = document.createElement('div');
+    card.className = 'conn-card';
+
+    const icon = document.createElement('div');
+    icon.className = 'conn-icon';
+    icon.style.cssText = 'background:#6b3cc9;color:#fff;';
+    icon.textContent = '🏦';
+    card.appendChild(icon);
+
+    const info = document.createElement('div');
+    info.className = 'conn-info';
+    const name = document.createElement('div');
+    name.className = 'conn-name';
+    name.textContent = 'Prometeo (Open Banking)';
+    const statusEl = document.createElement('div');
+    statusEl.className = 'conn-status ' + (connected ? 'connected' : 'disconnected');
+    statusEl.textContent = connected
+      ? 'Conectado' + (lastSync ? ' · última sync ' + new Date(lastSync).toLocaleDateString('es-AR') : '')
+      : 'Conectá con Prometeo para sincronizar tus bancos';
+    info.appendChild(name);
+    info.appendChild(statusEl);
+    card.appendChild(info);
+
+    const btn = document.createElement('button');
+    if (connected) {
+      btn.className = 'btn btn-danger btn-sm';
+      btn.textContent = 'Desconectar';
+      btn.onclick = async () => {
+        btn.disabled = true;
+        try {
+          await API.disconnectProvider('prometeo');
+          App.toast('Prometeo desconectado', 'success');
+          Settings.render();
+        } catch (err) {
+          App.toast(err.message, 'error');
+          btn.disabled = false;
+        }
+      };
+    } else {
+      btn.className = 'btn btn-primary btn-sm';
+      btn.textContent = 'Conectar';
+      btn.onclick = () => this._initPrometeoLink();
+    }
+    card.appendChild(btn);
+
+    if (connected) {
+      const syncBtn = document.createElement('button');
+      syncBtn.className = 'btn btn-ghost btn-sm';
+      syncBtn.style.marginLeft = '6px';
+      syncBtn.textContent = '↻';
+      syncBtn.title = 'Sincronizar ahora';
+      syncBtn.onclick = async () => {
+        syncBtn.disabled = true;
+        try {
+          const r = await API.syncPrometeoTransactions();
+          App.toast(r.saved + ' transacciones nuevas sincronizadas', 'success');
+        } catch (err) {
+          App.toast(err.message, 'error');
+        } finally {
+          syncBtn.disabled = false;
+        }
+      };
+      card.appendChild(syncBtn);
+    }
+
+    return card;
+  },
+
+  async _initPrometeoLink() {
+    try {
+      const { connector_id, auth_url } = await API.createPrometeoConnector();
+      if (!auth_url) {
+        App.toast('Error obteniendo URL de autorización', 'error');
+        return;
+      }
+
+      // Abrir URL en nueva pestaña
+      const authWindow = window.open(auth_url, 'prometeo-auth', 'width=600,height=700');
+
+      // Esperar confirmación del usuario (después de autorizar)
+      const checkInterval = setInterval(async () => {
+        if (authWindow.closed) {
+          clearInterval(checkInterval);
+          try {
+            await API.authorizePrometeo(connector_id);
+            App.toast('✅ Banco conectado exitosamente con Prometeo', 'success');
+
+            const result = await API.syncPrometeoTransactions();
+            App.toast(`✅ ${result.saved} transacciones sincronizadas`, 'success');
+
+            Settings.render();
+          } catch (err) {
+            App.toast(err.message, 'error');
+          }
+        }
+      }, 1000);
+    } catch (err) {
+      App.toast(err.message, 'error');
+    }
   },
 
   _buildBudgetForm(budget) {
