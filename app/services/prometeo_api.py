@@ -158,5 +158,43 @@ class PrometeoClient:
             print(f"Error en get_transactions: {e}")
             return []
 
-# Instancia global
-prometeo_client = PrometeoClient() if (os.getenv('PROMETEO_API_KEY') and os.getenv('PROMETEO_SECRET_KEY')) else None
+# Instancia global con lazy initialization
+_prometeo_client_instance = None
+
+class PrometeoClientWrapper:
+    """Wrapper para lazy initialization de PrometeoClient"""
+
+    def _get_client(self) -> Optional['PrometeoClient']:
+        global _prometeo_client_instance
+        if _prometeo_client_instance is None and os.getenv('PROMETEO_API_KEY'):
+            try:
+                _prometeo_client_instance = PrometeoClient()
+            except ValueError:
+                return None
+        return _prometeo_client_instance
+
+    async def create_connector(self, user_id: int, user_email: str) -> Optional[str]:
+        client = self._get_client()
+        if not client:
+            return None
+        return await client.create_connector(user_id, user_email)
+
+    async def get_connector_auth_url(self, connector_id: str) -> Optional[str]:
+        client = self._get_client()
+        if not client:
+            return None
+        return await client.get_connector_auth_url(connector_id)
+
+    async def get_accounts(self, connector_id: str) -> List[Dict]:
+        client = self._get_client()
+        if not client:
+            return []
+        return await client.get_accounts(connector_id)
+
+    async def get_transactions(self, connector_id: str, days: int = 30) -> List[Dict]:
+        client = self._get_client()
+        if not client:
+            return []
+        return await client.get_transactions(connector_id, days)
+
+prometeo_client = PrometeoClientWrapper()

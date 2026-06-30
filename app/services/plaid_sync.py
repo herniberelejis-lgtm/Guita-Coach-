@@ -149,5 +149,28 @@ class PlaidClient:
             print(f"Error en get_accounts: {e}")
             return []
 
-# Instancia global
-plaid_client = PlaidClient()
+# Instancia global con lazy initialization
+_plaid_client_instance = None
+
+class PlaidClientWrapper:
+    """Wrapper para lazy initialization de PlaidClient"""
+
+    def _get_client(self) -> PlaidClient:
+        global _plaid_client_instance
+        if _plaid_client_instance is None:
+            _plaid_client_instance = PlaidClient()
+        return _plaid_client_instance
+
+    async def create_link_token(self, user_id: int, user_email: str) -> Optional[str]:
+        return await self._get_client().create_link_token(user_id, user_email)
+
+    async def exchange_token(self, public_token: str) -> Optional[str]:
+        return await self._get_client().exchange_token(public_token)
+
+    async def get_transactions(self, access_token: str, days: int = 30) -> List[Dict]:
+        return await self._get_client().get_transactions(access_token, days)
+
+    async def get_accounts(self, access_token: str) -> List[Dict]:
+        return await self._get_client().get_accounts(access_token)
+
+plaid_client = PlaidClientWrapper()

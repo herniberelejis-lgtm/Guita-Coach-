@@ -293,7 +293,8 @@ async def create_prometeo_connector(
     db: Session = Depends(get_db)
 ):
     """Crear conector Prometeo para conectar con bancos"""
-    if not prometeo_client:
+    from ..config import get_settings
+    if not get_settings().prometeo_enabled:
         raise HTTPException(status_code=400, detail="Prometeo no está configurado")
 
     connector_id = await prometeo_client.create_connector(user.id, user.email)
@@ -355,7 +356,8 @@ async def sync_prometeo_transactions(
     db: Session = Depends(get_db)
 ):
     """Sincronizar transacciones desde Prometeo"""
-    if not prometeo_client:
+    from ..config import get_settings
+    if not get_settings().prometeo_enabled:
         raise HTTPException(status_code=400, detail="Prometeo no está configurado")
 
     connection = db.query(Connection).filter_by(
