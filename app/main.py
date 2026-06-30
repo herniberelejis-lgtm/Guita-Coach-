@@ -49,16 +49,18 @@ async def service_worker():
                         media_type="application/javascript",
                         headers={"Service-Worker-Allowed": "/"})
 
-@app.get("/privacidad", include_in_schema=False)
-@app.get("/privacy", include_in_schema=False)
-async def privacy_policy():
-    privacy_file = os.path.join(static_path, "privacidad.html")
-    if os.path.isfile(privacy_file):
-        return FileResponse(privacy_file, media_type="text/html")
-    return FileResponse(os.path.join(static_path, "index.html"))
-
 @app.get("/{full_path:path}", include_in_schema=False)
 async def spa_fallback(full_path: str):
+    # Páginas HTML estáticas propias
+    static_pages = {"privacidad", "privacy"}
+    if full_path in static_pages:
+        page = os.path.join(static_path, f"{full_path}.html")
+        # privacy → privacidad.html
+        if not os.path.isfile(page):
+            page = os.path.join(static_path, "privacidad.html")
+        if os.path.isfile(page):
+            return FileResponse(page, media_type="text/html")
+
     index = os.path.join(static_path, "index.html")
     if os.path.isfile(index):
         return FileResponse(index)
