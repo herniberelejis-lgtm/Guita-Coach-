@@ -1,5 +1,6 @@
 """Sync endpoints — Gmail, Mercado Pago, Plaid, y Prometeo."""
 from datetime import datetime
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File
 from sqlalchemy.orm import Session
 from ..database import get_db
@@ -10,7 +11,7 @@ from ..services.splits import detect_split_candidates
 from ..services.classifier import classify
 from ..services.alert_engine import run_alert_engine
 from ..services.plaid_sync import plaid_client
-from ..services.prometeo_api import prometeo_client
+from ..services.prometeo_api import get_prometeo_client
 
 router = APIRouter(prefix="/api/sync", tags=["sync"])
 
@@ -287,66 +288,65 @@ async def sync_plaid_transactions(
 
 # === PROMETEO ENDPOINTS ===
 
-@router.post("/prometeo/connector")
-async def create_prometeo_connector(
+@router.get("/prometeo/providers")
+async def list_prometeo_providers(user: User = Depends(get_current_user)):
+    """Listar bancos disponibles en Prometeo"""
+    client = get_prometeo_client()
+    if not client:
+        raise HTTPException(status_code=400, detail="Prometeo no configurado")
+    providers = await client.list_providers()
+    return {"providers": providers}
+
+
+class PrometeoLoginRequest(BaseModel):
+    provider: str
+    username: str
+    password: str
+    doc_type: str = "C"
+
+
+@router.post("/prometeo/login")
+async def prometeo_login(
+    body: PrometeoLoginRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Crear conector Prometeo para conectar con bancos"""
-    from ..config import get_settings
-    if not get_settings().prometeo_enabled:
-        raise HTTPException(status_code=400, detail="Prometeo no está configurado")
+    """Login a un banco vía Prometeo con credenciales del usuario"""
+    client = get_prometeo_client()
+    if not client:
+        raise HTTPException(status_code=400, detail="Prometeo no configurado")
 
-    connector_id = await prometeo_client.create_connector(user.id, user.email)
-    if not connector_id:
-        raise HTTPException(status_code=400, detail="Error creando conector de Prometeo")
+    result = await client.login(body.provider, body.username, body.password, body.doc_type)
+    if not result or result.get("status") == "error":
+        raise HTTPException(status_code=400, detail=result.get("message", "Error conectando al banco"))
 
-    auth_url = await prometeo_client.get_connector_auth_url(connector_id)
-    if not auth_url:
-        raise HTTPException(status_code=400, detail="Error obteniendo URL de autorización")
+    status = result.get("status")
+    session_key = result.get("session_key")
 
-    # Guardar connector_id en BD para usar luego
-    connection = db.query(Connection).filter_by(
-        user_id=user.id,
-        provider='prometeo'
-    ).first()
+    if status == "wrong_credentials":
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
 
-    if not connection:
-        connection = Connection(
-            user_id=user.id,
-            provider='prometeo',
-            access_token=connector_id,  # Guardar connector_id aquí
-            status='pending',
-        )
-        db.add(connection)
+    if status not in ("logged_in", "select_client"):
+        raise HTTPException(status_code=400, detail=f"Estado inesperado: {status}. {result.get('message','')}")
+
+    # Guardar sesión en BD
+    conn = db.query(Connection).filter_by(user_id=user.id, provider="prometeo").first()
+    if conn:
+        conn.access_token = session_key
+        conn.status = "connected"
+        conn.last_sync = datetime.utcnow()
     else:
-        connection.access_token = connector_id
-        connection.status = 'pending'
-
-    db.commit()
-    return {"connector_id": connector_id, "auth_url": auth_url}
-
-
-@router.post("/prometeo/authorize")
-async def authorize_prometeo(
-    connector_id: str,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Confirmar que usuario autorizó en Prometeo"""
-    connection = db.query(Connection).filter_by(
-        user_id=user.id,
-        provider='prometeo'
-    ).first()
-
-    if not connection:
-        raise HTTPException(status_code=400, detail="No hay conector Prometeo pendiente")
-
-    connection.status = 'connected'
-    connection.last_sync = datetime.utcnow()
+        conn = Connection(
+            user_id=user.id,
+            provider="prometeo",
+            access_token=session_key,
+            status="connected",
+            last_sync=datetime.utcnow(),
+        )
+        db.add(conn)
     db.commit()
 
-    return {"status": "connected", "message": "Banco conectado exitosamente con Prometeo"}
+    return {"status": "connected", "session_key": session_key, "bank_status": status}
 
 
 @router.post("/prometeo/sync")
@@ -355,61 +355,53 @@ async def sync_prometeo_transactions(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Sincronizar transacciones desde Prometeo"""
-    from ..config import get_settings
-    if not get_settings().prometeo_enabled:
-        raise HTTPException(status_code=400, detail="Prometeo no está configurado")
+    """Sincronizar transacciones desde Prometeo usando session key guardada"""
+    client = get_prometeo_client()
+    if not client:
+        raise HTTPException(status_code=400, detail="Prometeo no configurado")
 
-    connection = db.query(Connection).filter_by(
-        user_id=user.id,
-        provider='prometeo'
-    ).first()
+    conn = db.query(Connection).filter_by(user_id=user.id, provider="prometeo").first()
+    if not conn or conn.status != "connected":
+        raise HTTPException(status_code=400, detail="Prometeo no conectado. Conectá tu banco primero.")
 
-    if not connection or connection.status != 'connected':
-        raise HTTPException(status_code=400, detail="Prometeo no está conectado")
-
-    connector_id = connection.access_token
+    session_key = conn.access_token
 
     # Obtener cuentas
-    accounts = await prometeo_client.get_accounts(connector_id)
+    accounts = await client.get_accounts(session_key)
     if not accounts:
-        raise HTTPException(status_code=400, detail="Error obteniendo cuentas de Prometeo")
+        raise HTTPException(status_code=400, detail="No se pudieron obtener las cuentas. La sesión puede haber expirado.")
 
-    # Obtener transacciones
-    transactions = await prometeo_client.get_transactions(connector_id, days=90)
+    # Obtener movimientos de todas las cuentas
+    all_txns = []
+    for acc in accounts:
+        number = acc.get("number") or acc.get("account_id", "")
+        currency = acc.get("currency", "ARS")
+        if number:
+            movs = await client.get_movements(session_key, number, currency, days=90)
+            all_txns.extend(movs)
 
-    # Convertir formato Prometeo al formato esperado
+    # Convertir al formato interno
     items = []
-    for txn in transactions:
-        item = {
+    for txn in all_txns:
+        amount = float(txn.get("amount", 0))
+        items.append({
             "id": txn.get("transaction_id"),
             "date": txn.get("date"),
-            "amount": abs(float(txn.get("amount", 0))),
+            "amount": abs(amount),
             "merchant": txn.get("name", "Transacción"),
-            "category": txn.get("personal_finance_category", {}).get("primary", "Otros") if txn.get("personal_finance_category") else "Otros",
-            "tx_type": "income" if float(txn.get("amount", 0)) > 0 else "expense",
+            "tx_type": "income" if amount < 0 else "expense",
             "source": "prometeo",
-            "payment_method": "Transferencia",
-            "currency": "ARS",
+            "payment_method": "Transferencia Bancaria",
+            "currency": txn.get("iso_currency_code", "ARS"),
             "raw_reference": txn.get("transaction_id", ""),
-        }
-        items.append(item)
+        })
 
-    # Guardar transacciones
     saved = await _save_transactions(items, user_id=user.id, db=db)
-
-    connection.last_sync = datetime.utcnow()
+    conn.last_sync = datetime.utcnow()
     db.commit()
 
-    # Ejecutar deduplicación y alertas
     flagged = mark_duplicates_and_transfers(db, user.id)
     splits = detect_split_candidates(db, user.id)
     background_tasks.add_task(run_alert_engine, user.id, db)
 
-    return {
-        "ok": True,
-        "fetched": len(transactions),
-        "saved": saved,
-        "flagged": flagged,
-        "split_suggestions": splits
-    }
+    return {"ok": True, "fetched": len(all_txns), "saved": saved, "accounts": len(accounts), "flagged": flagged, "split_suggestions": splits}

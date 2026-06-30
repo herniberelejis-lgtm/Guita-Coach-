@@ -403,36 +403,101 @@ const Settings = {
   },
 
   async _initPrometeoLink() {
+    // Cargar bancos disponibles
+    let providers = [];
     try {
-      const { connector_id, auth_url } = await API.createPrometeoConnector();
-      if (!auth_url) {
-        App.toast('Error obteniendo URL de autorización', 'error');
+      const data = await API.listPrometeoProviders();
+      providers = data.providers || [];
+    } catch (e) {
+      // Si falla (ej: sandbox sin providers), usar lista hardcodeada AR
+      providers = [
+        { code: 'test_ar', name: '🧪 Banco de Prueba (Sandbox)' },
+        { code: 'bbva_ar', name: 'BBVA Argentina' },
+        { code: 'santander_ar', name: 'Santander Argentina' },
+        { code: 'galicia', name: 'Banco Galicia' },
+        { code: 'macro', name: 'Banco Macro' },
+        { code: 'nacion', name: 'Banco Nación' },
+        { code: 'ciudad', name: 'Banco Ciudad' },
+      ];
+    }
+
+    // Crear modal
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;display:flex;align-items:center;justify-content:center;';
+
+    const modal = document.createElement('div');
+    modal.style.cssText = 'background:#fff;border-radius:12px;padding:28px;width:380px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.3);';
+
+    modal.innerHTML = `
+      <h3 style="margin:0 0 6px;font-size:18px;">🏦 Conectar banco</h3>
+      <p style="margin:0 0 20px;color:#666;font-size:13px;">Ingresá las credenciales del home banking</p>
+      <label style="display:block;margin-bottom:12px;">
+        <span style="font-size:13px;font-weight:600;color:#333;">Banco</span>
+        <select id="prom-provider" style="width:100%;margin-top:4px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;">
+          ${providers.map(p => `<option value="${p.code}">${p.name}</option>`).join('')}
+        </select>
+      </label>
+      <label style="display:block;margin-bottom:12px;">
+        <span style="font-size:13px;font-weight:600;color:#333;">Usuario / DNI</span>
+        <input id="prom-user" type="text" placeholder="Tu usuario del home banking"
+          style="width:100%;margin-top:4px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;"/>
+      </label>
+      <label style="display:block;margin-bottom:20px;">
+        <span style="font-size:13px;font-weight:600;color:#333;">Contraseña</span>
+        <input id="prom-pass" type="password" placeholder="Tu contraseña del home banking"
+          style="width:100%;margin-top:4px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;"/>
+      </label>
+      <p style="margin:0 0 16px;font-size:11px;color:#888;background:#f8f8f8;padding:8px 10px;border-radius:6px;">
+        🔒 Tus credenciales se usan solo para conectar a tu banco vía Prometeo. No se almacenan.
+      </p>
+      <div style="display:flex;gap:10px;">
+        <button id="prom-cancel" style="flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;font-size:14px;">Cancelar</button>
+        <button id="prom-connect" style="flex:2;padding:10px;border:none;border-radius:8px;background:#6b3cc9;color:#fff;cursor:pointer;font-size:14px;font-weight:600;">Conectar</button>
+      </div>
+      <div id="prom-error" style="margin-top:12px;color:#e53935;font-size:13px;display:none;"></div>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    const close = () => document.body.removeChild(overlay);
+    document.getElementById('prom-cancel').onclick = close;
+    overlay.onclick = (e) => { if (e.target === overlay) close(); };
+
+    document.getElementById('prom-connect').onclick = async () => {
+      const provider = document.getElementById('prom-provider').value;
+      const username = document.getElementById('prom-user').value.trim();
+      const password = document.getElementById('prom-pass').value;
+      const errEl = document.getElementById('prom-error');
+      const btn = document.getElementById('prom-connect');
+
+      if (!username || !password) {
+        errEl.textContent = 'Completá usuario y contraseña';
+        errEl.style.display = 'block';
         return;
       }
 
-      // Abrir URL en nueva pestaña
-      const authWindow = window.open(auth_url, 'prometeo-auth', 'width=600,height=700');
+      btn.disabled = true;
+      btn.textContent = 'Conectando...';
+      errEl.style.display = 'none';
 
-      // Esperar confirmación del usuario (después de autorizar)
-      const checkInterval = setInterval(async () => {
-        if (authWindow.closed) {
-          clearInterval(checkInterval);
-          try {
-            await API.authorizePrometeo(connector_id);
-            App.toast('✅ Banco conectado exitosamente con Prometeo', 'success');
+      try {
+        await API.prometeoLogin(provider, username, password, 'C');
+        close();
+        App.toast('✅ Banco conectado', 'success');
 
-            const result = await API.syncPrometeoTransactions();
-            App.toast(`✅ ${result.saved} transacciones sincronizadas`, 'success');
-
-            Settings.render();
-          } catch (err) {
-            App.toast(err.message, 'error');
-          }
-        }
-      }, 1000);
-    } catch (err) {
-      App.toast(err.message, 'error');
-    }
+        // Sincronizar inmediatamente
+        btn.textContent = 'Sincronizando...';
+        const result = await API.syncPrometeoTransactions();
+        App.toast(`✅ ${result.saved} transacciones sincronizadas de ${result.accounts} cuenta(s)`, 'success');
+        Settings.render();
+      } catch (err) {
+        errEl.textContent = err.message || 'Error conectando al banco';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Conectar';
+      }
+    };
   },
 
   _buildBudgetForm(budget) {
