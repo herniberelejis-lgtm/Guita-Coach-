@@ -1,7 +1,7 @@
 """FastAPI entry point — monta routers y sirve el frontend estático."""
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 import os
 
 from .database import init_db
@@ -49,18 +49,16 @@ async def service_worker():
                         media_type="application/javascript",
                         headers={"Service-Worker-Allowed": "/"})
 
+@app.get("/privacidad", include_in_schema=False)
+@app.get("/privacy", include_in_schema=False)
+async def privacy_policy():
+    """Política de privacidad — ruta explícita antes del catch-all SPA."""
+    page = os.path.join(static_path, "privacidad.html")
+    content = open(page, encoding="utf-8").read()
+    return HTMLResponse(content=content, headers={"Cache-Control": "no-store"})
+
 @app.get("/{full_path:path}", include_in_schema=False)
 async def spa_fallback(full_path: str):
-    # Páginas HTML estáticas propias
-    static_pages = {"privacidad", "privacy"}
-    if full_path in static_pages:
-        page = os.path.join(static_path, f"{full_path}.html")
-        # privacy → privacidad.html
-        if not os.path.isfile(page):
-            page = os.path.join(static_path, "privacidad.html")
-        if os.path.isfile(page):
-            return FileResponse(page, media_type="text/html")
-
     index = os.path.join(static_path, "index.html")
     if os.path.isfile(index):
         return FileResponse(index)
