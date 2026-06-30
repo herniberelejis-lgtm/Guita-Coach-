@@ -10,6 +10,7 @@ from ..services.splits import detect_split_candidates
 from ..services.classifier import classify
 from ..services.alert_engine import run_alert_engine
 from ..services.plaid_sync import plaid_client
+from ..services.prometeo_api import prometeo_client
 
 router = APIRouter(prefix="/api/sync", tags=["sync"])
 
@@ -258,6 +259,134 @@ async def sync_plaid_transactions(
             "category": txn.get("personal_finance_category", {}).get("primary", "Otros") if txn.get("personal_finance_category") else "Otros",
             "tx_type": "income" if float(txn.get("amount", 0)) > 0 else "expense",
             "source": "plaid",
+            "payment_method": "Transferencia",
+            "currency": "ARS",
+            "raw_reference": txn.get("transaction_id", ""),
+        }
+        items.append(item)
+
+    # Guardar transacciones
+    saved = await _save_transactions(items, user_id=user.id, db=db)
+
+    connection.last_sync = datetime.utcnow()
+    db.commit()
+
+    # Ejecutar deduplicación y alertas
+    flagged = mark_duplicates_and_transfers(db, user.id)
+    splits = detect_split_candidates(db, user.id)
+    background_tasks.add_task(run_alert_engine, user.id, db)
+
+    return {
+        "ok": True,
+        "fetched": len(transactions),
+        "saved": saved,
+        "flagged": flagged,
+        "split_suggestions": splits
+    }
+
+
+# === PROMETEO ENDPOINTS ===
+
+@router.post("/prometeo/connector")
+async def create_prometeo_connector(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Crear conector Prometeo para conectar con bancos"""
+    if not prometeo_client:
+        raise HTTPException(status_code=400, detail="Prometeo no está configurado")
+
+    connector_id = await prometeo_client.create_connector(user.id, user.email)
+    if not connector_id:
+        raise HTTPException(status_code=400, detail="Error creando conector de Prometeo")
+
+    auth_url = await prometeo_client.get_connector_auth_url(connector_id)
+    if not auth_url:
+        raise HTTPException(status_code=400, detail="Error obteniendo URL de autorización")
+
+    # Guardar connector_id en BD para usar luego
+    connection = db.query(Connection).filter_by(
+        user_id=user.id,
+        provider='prometeo'
+    ).first()
+
+    if not connection:
+        connection = Connection(
+            user_id=user.id,
+            provider='prometeo',
+            access_token=connector_id,  # Guardar connector_id aquí
+            status='pending',
+        )
+        db.add(connection)
+    else:
+        connection.access_token = connector_id
+        connection.status = 'pending'
+
+    db.commit()
+    return {"connector_id": connector_id, "auth_url": auth_url}
+
+
+@router.post("/prometeo/authorize")
+async def authorize_prometeo(
+    connector_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Confirmar que usuario autorizó en Prometeo"""
+    connection = db.query(Connection).filter_by(
+        user_id=user.id,
+        provider='prometeo'
+    ).first()
+
+    if not connection:
+        raise HTTPException(status_code=400, detail="No hay conector Prometeo pendiente")
+
+    connection.status = 'connected'
+    connection.last_sync = datetime.utcnow()
+    db.commit()
+
+    return {"status": "connected", "message": "Banco conectado exitosamente con Prometeo"}
+
+
+@router.post("/prometeo/sync")
+async def sync_prometeo_transactions(
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Sincronizar transacciones desde Prometeo"""
+    if not prometeo_client:
+        raise HTTPException(status_code=400, detail="Prometeo no está configurado")
+
+    connection = db.query(Connection).filter_by(
+        user_id=user.id,
+        provider='prometeo'
+    ).first()
+
+    if not connection or connection.status != 'connected':
+        raise HTTPException(status_code=400, detail="Prometeo no está conectado")
+
+    connector_id = connection.access_token
+
+    # Obtener cuentas
+    accounts = await prometeo_client.get_accounts(connector_id)
+    if not accounts:
+        raise HTTPException(status_code=400, detail="Error obteniendo cuentas de Prometeo")
+
+    # Obtener transacciones
+    transactions = await prometeo_client.get_transactions(connector_id, days=90)
+
+    # Convertir formato Prometeo al formato esperado
+    items = []
+    for txn in transactions:
+        item = {
+            "id": txn.get("transaction_id"),
+            "date": txn.get("date"),
+            "amount": abs(float(txn.get("amount", 0))),
+            "merchant": txn.get("name", "Transacción"),
+            "category": txn.get("personal_finance_category", {}).get("primary", "Otros") if txn.get("personal_finance_category") else "Otros",
+            "tx_type": "income" if float(txn.get("amount", 0)) > 0 else "expense",
+            "source": "prometeo",
             "payment_method": "Transferencia",
             "currency": "ARS",
             "raw_reference": txn.get("transaction_id", ""),

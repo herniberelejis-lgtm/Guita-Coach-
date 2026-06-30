@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     plaid_secret: str = ""
     plaid_env: str = "sandbox"
     plaid_country_codes: str = "AR"
+    prometeo_api_key: str = ""
+    prometeo_secret_key: str = ""
+    prometeo_env: str = "sandbox"
     app_url: str = "http://localhost:8000"
     port: int = 8000
     demo_mode: bool = True
@@ -39,6 +42,10 @@ class Settings(BaseSettings):
     @property
     def plaid_enabled(self) -> bool:
         return bool(self.plaid_client_id and self.plaid_secret)
+
+    @property
+    def prometeo_enabled(self) -> bool:
+        return bool(self.prometeo_api_key and self.prometeo_secret_key)
 
     @property
     def ai_enabled(self) -> bool:
