@@ -45,6 +45,12 @@ const Investments = {
     const riskWrap = document.createElement('div');
     page.appendChild(riskWrap);
 
+    const analyticsWrap = document.createElement('div');
+    page.appendChild(analyticsWrap);
+
+    const riskMetricsWrap = document.createElement('div');
+    page.appendChild(riskMetricsWrap);
+
     const timelineWrap = document.createElement('div');
     page.appendChild(timelineWrap);
 
@@ -63,16 +69,20 @@ const Investments = {
     page.appendChild(historyBlock.block);
 
     // Cargar datos en paralelo
-    const [summary, holdings, history, timeline, closed] = await Promise.all([
+    const [summary, holdings, history, timeline, closed, analytics, riskMetrics] = await Promise.all([
       API.getInvestmentSummary().catch(() => null),
       API.getInvestmentHoldings().catch(() => []),
       API.getInvestmentHistory().catch(() => []),
       API.getInvestmentTimeline().catch(() => null),
       API.getInvestmentClosed().catch(() => []),
+      API.getInvestmentAnalytics().catch(() => null),
+      API.getInvestmentRiskMetrics().catch(() => null),
     ]);
 
     this._renderSummary(summaryWrap, summary);
     this._renderRisk(riskWrap, summary);
+    this._renderAnalytics(analyticsWrap, analytics);
+    this._renderRiskMetrics(riskMetricsWrap, riskMetrics);
     this._renderTimeline(timelineWrap, timeline);
     this._renderCharts(chartsWrap, holdings, summary);
     this._renderHoldings(holdingsBlock.body, holdings);
@@ -789,5 +799,158 @@ const Investments = {
       btn.disabled = false;
       btn.textContent = orig;
     }
+  },
+
+  _renderAnalytics(wrap, data) {
+    if (!data) return;
+
+    const block = document.createElement('div');
+    block.className = 'inv-block';
+    const title = document.createElement('p');
+    title.className = 'section-title';
+    title.textContent = 'Análisis';
+    block.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.className = 'inv-grid';
+
+    const metrics = [
+      { label: 'TIR (%)', value: data.xirr_pct !== null ? data.xirr_pct.toFixed(2) : '—' },
+      { label: 'Win Rate', value: `${data.win_rate_pct.toFixed(0)}%` },
+      { label: 'Profit Factor', value: data.profit_factor.toFixed(2) },
+      { label: 'Mejor Trade', value: data.best_trade_pct !== null ? `${data.best_trade_pct.toFixed(1)}%` : '—' },
+      { label: 'Peor Trade', value: data.worst_trade_pct !== null ? `${data.worst_trade_pct.toFixed(1)}%` : '—' },
+      { label: 'Holding Promedio', value: `${data.avg_holding_days.toFixed(0)} días` },
+    ];
+
+    metrics.forEach(m => {
+      const box = document.createElement('div');
+      box.className = 'inv-metric';
+      box.innerHTML = `<p class="label">${m.label}</p><p class="value">${m.value}</p>`;
+      grid.appendChild(box);
+    });
+
+    block.appendChild(grid);
+
+    if (data.fiscal_summary && Object.keys(data.fiscal_summary).length > 0) {
+      const fiscal = document.createElement('div');
+      fiscal.style.marginTop = '12px';
+      const fTitle = document.createElement('p');
+      fTitle.style.cssText = 'font-size:.9rem;color:var(--muted);margin-bottom:6px;';
+      fTitle.textContent = 'Resumen Fiscal';
+      fiscal.appendChild(fTitle);
+
+      const table = document.createElement('table');
+      table.style.cssText = 'width:100%;font-size:.85rem;';
+      const thead = document.createElement('thead');
+      thead.innerHTML = '<tr><th>Año</th><th>P&L Realizado</th><th>Eventos</th></tr>';
+      table.appendChild(thead);
+      const tbody = document.createElement('tbody');
+      Object.entries(data.fiscal_summary).forEach(([year, val]) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${year}</td><td>${App.fmt(val.realized_pnl)}</td><td>${val.tax_event_count}</td>`;
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      fiscal.appendChild(table);
+      block.appendChild(fiscal);
+    }
+
+    wrap.appendChild(block);
+  },
+
+  _renderRiskMetrics(wrap, data) {
+    if (!data) return;
+
+    const block = document.createElement('div');
+    block.className = 'inv-block';
+    const title = document.createElement('p');
+    title.className = 'section-title';
+    title.textContent = 'Métricas de Riesgo Avanzadas';
+    block.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.className = 'inv-grid';
+
+    const metrics = [
+      { label: 'VaR 95%', value: data.var_95_pct !== null ? `${data.var_95_pct.toFixed(2)}%` : '—' },
+      { label: 'VaR 99%', value: data.var_99_pct !== null ? `${data.var_99_pct.toFixed(2)}%` : '—' },
+      { label: 'CVaR 95%', value: data.cvar_95_pct !== null ? `${data.cvar_95_pct.toFixed(2)}%` : '—' },
+      { label: 'CVaR 99%', value: data.cvar_99_pct !== null ? `${data.cvar_99_pct.toFixed(2)}%` : '—' },
+      { label: 'Max Drawdown', value: `${data.max_drawdown_pct.toFixed(2)}%` },
+      { label: 'Drawdown Actual', value: `${data.current_drawdown_pct.toFixed(2)}%` },
+    ];
+
+    metrics.forEach(m => {
+      const box = document.createElement('div');
+      box.className = 'inv-metric';
+      box.innerHTML = `<p class="label">${m.label}</p><p class="value">${m.value}</p>`;
+      grid.appendChild(box);
+    });
+
+    block.appendChild(grid);
+
+    // Stress scenarios
+    if (data.stress_scenarios && Object.keys(data.stress_scenarios).length > 0) {
+      const stress = document.createElement('div');
+      stress.style.marginTop = '12px';
+      const sTitle = document.createElement('p');
+      sTitle.style.cssText = 'font-size:.9rem;color:var(--muted);margin-bottom:6px;';
+      sTitle.textContent = 'Escenarios de Estrés';
+      stress.appendChild(sTitle);
+
+      const stressGrid = document.createElement('div');
+      stressGrid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;';
+      Object.entries(data.stress_scenarios).forEach(([scenario, value]) => {
+        const box = document.createElement('div');
+        box.style.cssText = 'border:1px solid var(--navy3);padding:8px;border-radius:4px;font-size:.8rem;text-align:center;';
+        box.innerHTML = `<p style="color:var(--muted);margin:0;">${scenario}</p><p style="margin:4px 0 0;font-weight:bold;">${App.fmt(value)}</p>`;
+        stressGrid.appendChild(box);
+      });
+      stress.appendChild(stressGrid);
+      block.appendChild(stress);
+    }
+
+    // Correlation matrix
+    if (data.correlation && Object.keys(data.correlation).length > 0) {
+      const corr = document.createElement('div');
+      corr.style.marginTop = '12px';
+      const cTitle = document.createElement('p');
+      cTitle.style.cssText = 'font-size:.9rem;color:var(--muted);margin-bottom:6px;';
+      cTitle.textContent = 'Matriz de Correlación';
+      corr.appendChild(cTitle);
+
+      const table = document.createElement('table');
+      table.style.cssText = 'width:100%;font-size:.75rem;border-collapse:collapse;';
+      const tickers = Object.keys(data.correlation).sort();
+
+      // Header
+      const thead = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      headerRow.innerHTML = '<th style="text-align:left;"></th>';
+      tickers.forEach(t => {
+        headerRow.innerHTML += `<th style="padding:4px;">${t}</th>`;
+      });
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      // Body
+      const tbody = document.createElement('tbody');
+      tickers.forEach(t1 => {
+        const row = document.createElement('tr');
+        row.innerHTML = `<td style="text-align:left;font-weight:bold;">${t1}</td>`;
+        tickers.forEach(t2 => {
+          const val = data.correlation[t1] && data.correlation[t1][t2] !== undefined ? data.correlation[t1][t2] : 0;
+          const color = val > 0 ? '#ff6b6b' : val < 0 ? '#51cf66' : '#888';
+          row.innerHTML += `<td style="text-align:center;padding:4px;background-color:${color}20;">${val.toFixed(2)}</td>`;
+        });
+        tbody.appendChild(row);
+      });
+      table.appendChild(tbody);
+      corr.appendChild(table);
+      block.appendChild(corr);
+    }
+
+    wrap.appendChild(block);
   },
 };

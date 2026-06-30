@@ -58,6 +58,18 @@ const API = {
       credentials: 'include'
     }).then(res => res.ok ? res.json() : res.json().then(e => Promise.reject(new Error(e.detail))));
   },
+  getInvestmentAnalytics: () => API.get('/investments/analytics'),
+  getInvestmentRiskMetrics: () => API.get('/investments/risk-metrics'),
+  getInvestmentHistoryFiltered: (params = {}) => {
+    const q = new URLSearchParams(params).toString();
+    return API.get('/investments/history-v2' + (q ? '?' + q : ''));
+  },
+  exportInvestmentCSV: (params = {}) => {
+    const q = new URLSearchParams(params).toString();
+    return API.get('/investments/export-csv' + (q ? '?' + q : ''));
+  },
+  updateInvestmentTransaction: (id, data) => API.patch(`/investments/transaction/${id}`, data),
+  deleteInvestmentTransaction: (id) => API.delete(`/investments/transaction/${id}`),
 
   // Sync
   syncGmail:  () => API.post('/sync/gmail'),

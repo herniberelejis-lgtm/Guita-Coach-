@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 import os
 
 from .database import init_db
-from .routers import auth, budget, transactions, insights, sync, advisor, chat, goals, investments, academy
+from .routers import auth, budget, transactions, insights, sync, advisor, chat, goals, investments, investments_extra, academy
 
 app = FastAPI(title="Guita Coach", version="0.2.0", docs_url="/api/docs")
 
@@ -35,6 +35,7 @@ app.include_router(advisor.router)
 app.include_router(chat.router)
 app.include_router(goals.router)
 app.include_router(investments.router)
+app.include_router(investments_extra.router)
 app.include_router(academy.router)
 
 # ─── Static frontend ─────────────────────────────────────────────────────────
