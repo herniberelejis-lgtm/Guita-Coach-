@@ -1,4 +1,4 @@
-"""Sync endpoints — Gmail y Mercado Pago."""
+"""Sync endpoints — Gmail, Mercado Pago, y Plaid."""
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File
 from sqlalchemy.orm import Session
@@ -9,6 +9,7 @@ from ..services.dedup import find_cross_source_duplicate, mark_duplicates_and_tr
 from ..services.splits import detect_split_candidates
 from ..services.classifier import classify
 from ..services.alert_engine import run_alert_engine
+from ..services.plaid_sync import plaid_client
 
 router = APIRouter(prefix="/api/sync", tags=["sync"])
 
@@ -179,4 +180,105 @@ def sync_status(db: Session = Depends(get_db), user: User = Depends(get_current_
             "last_sync": c.last_sync.isoformat() if c.last_sync else None,
         }
         for c in conns
+    }
+
+
+# === PLAID ENDPOINTS ===
+
+@router.post("/plaid/link_token")
+async def get_plaid_link_token(user: User = Depends(get_current_user)):
+    """Obtener link token para conectar con Plaid"""
+    link_token = await plaid_client.create_link_token(user.id, user.email)
+    if not link_token:
+        raise HTTPException(status_code=400, detail="Error creando link token de Plaid")
+    return {"link_token": link_token}
+
+
+@router.post("/plaid/exchange_token")
+async def exchange_plaid_token(
+    public_token: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Intercambiar public token por access token y guardar conexión"""
+    access_token = await plaid_client.exchange_token(public_token)
+    if not access_token:
+        raise HTTPException(status_code=400, detail="Error intercambiando token")
+
+    # Guardar o actualizar conexión en DB
+    connection = db.query(Connection).filter_by(
+        user_id=user.id,
+        provider='plaid'
+    ).first()
+
+    if connection:
+        connection.access_token = access_token
+        connection.status = 'connected'
+        connection.last_sync = datetime.utcnow()
+    else:
+        connection = Connection(
+            user_id=user.id,
+            provider='plaid',
+            access_token=access_token,
+            status='connected',
+            last_sync=datetime.utcnow()
+        )
+        db.add(connection)
+
+    db.commit()
+    return {"status": "connected", "message": "Banco conectado exitosamente"}
+
+
+@router.post("/plaid/sync")
+async def sync_plaid_transactions(
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Sincronizar transacciones desde Plaid"""
+    connection = db.query(Connection).filter_by(
+        user_id=user.id,
+        provider='plaid'
+    ).first()
+
+    if not connection:
+        raise HTTPException(status_code=400, detail="Plaid no está conectado")
+
+    # Obtener transacciones
+    transactions = await plaid_client.get_transactions(connection.access_token, days=90)
+
+    # Convertir formato Plaid al formato esperado
+    items = []
+    for txn in transactions:
+        item = {
+            "id": txn.get("transaction_id"),
+            "date": txn.get("date"),
+            "amount": abs(float(txn.get("amount", 0))),
+            "merchant": txn.get("name", "Transacción"),
+            "category": txn.get("personal_finance_category", {}).get("primary", "Otros") if txn.get("personal_finance_category") else "Otros",
+            "tx_type": "income" if float(txn.get("amount", 0)) > 0 else "expense",
+            "source": "plaid",
+            "payment_method": "Transferencia",
+            "currency": "ARS",
+            "raw_reference": txn.get("transaction_id", ""),
+        }
+        items.append(item)
+
+    # Guardar transacciones
+    saved = await _save_transactions(items, user_id=user.id, db=db)
+
+    connection.last_sync = datetime.utcnow()
+    db.commit()
+
+    # Ejecutar deduplicación y alertas
+    flagged = mark_duplicates_and_transfers(db, user.id)
+    splits = detect_split_candidates(db, user.id)
+    background_tasks.add_task(run_alert_engine, user.id, db)
+
+    return {
+        "ok": True,
+        "fetched": len(transactions),
+        "saved": saved,
+        "flagged": flagged,
+        "split_suggestions": splits
     }

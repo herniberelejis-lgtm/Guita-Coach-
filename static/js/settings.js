@@ -52,6 +52,11 @@ const Settings = {
       main.appendChild(this._buildConnCard(cfg, connected, status?.last_sync));
     });
 
+    // ── Plaid (Bancos) ─────────────────────────────────────────────────────
+    const plaidStatus = syncStatus['plaid'];
+    const plaidConnected = plaidStatus?.status === 'connected';
+    main.appendChild(this._buildPlaidCard(plaidConnected, plaidStatus?.last_sync));
+
     // ── Import CSV de MP ─────────────────────────────────────────────────────
     main.appendChild(this._buildCsvImportCard());
 
@@ -195,6 +200,132 @@ const Settings = {
     }
 
     return card;
+  },
+
+  _buildPlaidCard(connected, lastSync) {
+    const card = document.createElement('div');
+    card.className = 'conn-card';
+
+    const icon = document.createElement('div');
+    icon.className = 'conn-icon';
+    icon.style.cssText = 'background:#52b882;color:#fff;';
+    icon.textContent = '🏦';
+    card.appendChild(icon);
+
+    const info = document.createElement('div');
+    info.className = 'conn-info';
+    const name = document.createElement('div');
+    name.className = 'conn-name';
+    name.textContent = 'Banco (Plaid)';
+    const statusEl = document.createElement('div');
+    statusEl.className = 'conn-status ' + (connected ? 'connected' : 'disconnected');
+    statusEl.textContent = connected
+      ? 'Conectado' + (lastSync ? ' · última sync ' + new Date(lastSync).toLocaleDateString('es-AR') : '')
+      : 'Conectá tu banco para sincronizar automáticamente';
+    info.appendChild(name);
+    info.appendChild(statusEl);
+    card.appendChild(info);
+
+    const btn = document.createElement('button');
+    if (connected) {
+      btn.className = 'btn btn-danger btn-sm';
+      btn.textContent = 'Desconectar';
+      btn.onclick = async () => {
+        btn.disabled = true;
+        try {
+          await API.disconnectProvider('plaid');
+          App.toast('Banco desconectado', 'success');
+          Settings.render();
+        } catch (err) {
+          App.toast(err.message, 'error');
+          btn.disabled = false;
+        }
+      };
+    } else {
+      btn.className = 'btn btn-primary btn-sm';
+      btn.textContent = 'Conectar';
+      btn.onclick = () => this._initPlaidLink();
+    }
+    card.appendChild(btn);
+
+    if (connected) {
+      const syncBtn = document.createElement('button');
+      syncBtn.className = 'btn btn-ghost btn-sm';
+      syncBtn.style.marginLeft = '6px';
+      syncBtn.textContent = '↻';
+      syncBtn.title = 'Sincronizar ahora';
+      syncBtn.onclick = async () => {
+        syncBtn.disabled = true;
+        try {
+          const r = await API.syncPlaidTransactions();
+          App.toast(r.saved + ' transacciones nuevas sincronizadas', 'success');
+        } catch (err) {
+          App.toast(err.message, 'error');
+        } finally {
+          syncBtn.disabled = false;
+        }
+      };
+      card.appendChild(syncBtn);
+    }
+
+    return card;
+  },
+
+  async _initPlaidLink() {
+    try {
+      const { link_token } = await API.getPlaidLinkToken();
+      if (!link_token) {
+        App.toast('Error obteniendo link token', 'error');
+        return;
+      }
+
+      if (!window.Plaid) {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.plaid.com/link/v3/stable/link-initialize.js';
+        script.async = true;
+        script.onload = () => this._openPlaidLink(link_token);
+        script.onerror = () => App.toast('Error cargando Plaid', 'error');
+        document.body.appendChild(script);
+      } else {
+        this._openPlaidLink(link_token);
+      }
+    } catch (err) {
+      App.toast(err.message, 'error');
+    }
+  },
+
+  _openPlaidLink(linkToken) {
+    if (!window.Plaid) {
+      App.toast('Plaid no está disponible', 'error');
+      return;
+    }
+
+    const handler = window.Plaid.create({
+      token: linkToken,
+      onSuccess: async (public_token, metadata) => {
+        try {
+          await API.exchangePlaidToken(public_token);
+          App.toast('✅ Banco conectado exitosamente', 'success');
+
+          const result = await API.syncPlaidTransactions();
+          App.toast(`✅ ${result.saved} transacciones sincronizadas`, 'success');
+
+          Settings.render();
+        } catch (err) {
+          App.toast(err.message, 'error');
+        }
+      },
+      onExit: (err, metadata) => {
+        if (err !== null) {
+          console.error('Error en Plaid:', err);
+        }
+      },
+      onEvent: (eventName, metadata) => {
+        console.log('Plaid event:', eventName);
+      },
+    });
+
+    handler.open();
   },
 
   _buildBudgetForm(budget) {
