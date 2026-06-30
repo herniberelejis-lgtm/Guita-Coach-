@@ -9,25 +9,25 @@ class PrometeoClient:
 
     def __init__(self):
         self.api_key = os.getenv('PROMETEO_API_KEY', '')
-        self.secret_key = os.getenv('PROMETEO_SECRET_KEY', '')
+        self.secret_key = os.getenv('PROMETEO_SECRET_KEY', '')  # Optional
         self.env = os.getenv('PROMETEO_ENV', 'sandbox')
 
         self.url_base = 'https://api.prometeoapi.com' if self.env == 'production' else 'https://sandbox.prometeoapi.com'
 
-        if not self.api_key or not self.secret_key:
-            raise ValueError("PROMETEO_API_KEY y PROMETEO_SECRET_KEY requeridos en .env")
-
-        # Preparar auth básica
-        credentials = f"{self.api_key}:{self.secret_key}"
-        self.auth_header = b64encode(credentials.encode()).decode()
+        if not self.api_key:
+            raise ValueError("PROMETEO_API_KEY requerido en .env")
 
     def _headers(self) -> Dict[str, str]:
         """Headers para autenticar con Prometeo"""
-        return {
-            "Authorization": f"Basic {self.auth_header}",
+        headers = {
             "Content-Type": "application/json",
             "User-Agent": "Guita-Coach/1.0"
         }
+
+        # Usar Bearer token con API Key
+        headers["Authorization"] = f"Bearer {self.api_key}"
+
+        return headers
 
     async def create_connector(self, user_id: int, user_email: str) -> Optional[str]:
         """Crear conector para que usuario autorice acceso a sus bancos"""

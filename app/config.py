@@ -45,7 +45,7 @@ class Settings(BaseSettings):
 
     @property
     def prometeo_enabled(self) -> bool:
-        return bool(self.prometeo_api_key and self.prometeo_secret_key)
+        return bool(self.prometeo_api_key)  # Solo necesita API Key
 
     @property
     def ai_enabled(self) -> bool:
