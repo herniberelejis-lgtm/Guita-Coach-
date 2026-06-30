@@ -1,4 +1,4 @@
-"""Sync endpoints — Gmail, Mercado Pago, y Plaid."""
+"""Sync endpoints — Gmail, Mercado Pago, Plaid, y Prometeo."""
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File
 from sqlalchemy.orm import Session
