@@ -56,4 +56,5 @@ if __name__ == "__main__":
     print(f"\n✅ Abrí: http://localhost:{port}\n")
 
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=True)
+    # reload=False para evitar reinicios continuos en desarrollo local
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=False)
