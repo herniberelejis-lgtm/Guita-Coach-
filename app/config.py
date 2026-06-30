@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     mp_client_id: str = ""
     mp_client_secret: str = ""
+    plaid_client_id: str = ""
+    plaid_secret: str = ""
+    plaid_env: str = "sandbox"
+    plaid_country_codes: str = "AR"
     app_url: str = "http://localhost:8000"
     port: int = 8000
     demo_mode: bool = True
@@ -31,6 +35,10 @@ class Settings(BaseSettings):
     @property
     def mp_enabled(self) -> bool:
         return bool(self.mp_client_id and self.mp_client_secret)
+
+    @property
+    def plaid_enabled(self) -> bool:
+        return bool(self.plaid_client_id and self.plaid_secret)
 
     @property
     def ai_enabled(self) -> bool:
