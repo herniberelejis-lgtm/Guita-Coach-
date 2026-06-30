@@ -802,7 +802,10 @@ const Investments = {
   },
 
   _renderAnalytics(wrap, data) {
-    if (!data) return;
+    if (!data) {
+      wrap.textContent = '';
+      return;
+    }
 
     const block = document.createElement('div');
     block.className = 'inv-block';
@@ -860,7 +863,10 @@ const Investments = {
   },
 
   _renderRiskMetrics(wrap, data) {
-    if (!data) return;
+    if (!data) {
+      wrap.textContent = '';
+      return;
+    }
 
     const block = document.createElement('div');
     block.className = 'inv-block';
