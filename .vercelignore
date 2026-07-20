@@ -1,0 +1,12 @@
+guita.db
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.*
+docs/
+tests/
+design-system/
+PROGRESO.md
+PROJECT_STATUS.md
+GUITA_COACH_OVERVIEW.html
