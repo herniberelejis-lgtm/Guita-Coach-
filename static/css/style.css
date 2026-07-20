@@ -17,7 +17,11 @@
   --font-head: 'IBM Plex Sans', system-ui, sans-serif;
   --radius: 12px;
   --shadow: 0 4px 24px rgba(0,0,0,0.5);
-  --transition: .2s ease;
+  /* Custom easing curves — never use bare `ease` for UI */
+  --ease-out:    cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --transition: .18s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 html, body {
@@ -78,7 +82,7 @@ nav a {
   color: var(--muted);
   font-size: .92rem;
   font-weight: 500;
-  transition: all var(--transition);
+  transition: color var(--transition), background-color var(--transition), border-color var(--transition);
   cursor: pointer;
   border-left: 3px solid transparent;
 }
@@ -140,7 +144,7 @@ nav a svg { width: 18px; height: 18px; flex-shrink: 0; }
 .progress-fill {
   height: 100%;
   border-radius: 99px;
-  transition: width .5s ease;
+  transition: width 600ms var(--ease-out);
 }
 .progress-fill.ok     { background: var(--ok); }
 .progress-fill.warn   { background: var(--warn); }
@@ -192,8 +196,16 @@ nav a svg { width: 18px; height: 18px; flex-shrink: 0; }
   display: inline-flex; align-items: center; gap: 6px;
   padding: 9px 18px; border-radius: 8px;
   font-family: var(--font-body); font-size: .88rem; font-weight: 600;
-  cursor: pointer; transition: all var(--transition); border: none;
+  cursor: pointer; border: none;
+  transition: background-color 160ms var(--ease-out),
+              color 160ms var(--ease-out),
+              border-color 160ms var(--ease-out),
+              box-shadow 160ms var(--ease-out),
+              transform 120ms var(--ease-out);
 }
+/* Press feedback — instant tactile response on every button */
+.btn:not(:disabled):active { transform: scale(0.97); }
+
 .btn-primary   { background: var(--gold); color: var(--bg); }
 .btn-primary:hover { background: var(--gold2); }
 .btn-primary:focus-visible {
@@ -289,7 +301,7 @@ nav a svg { width: 18px; height: 18px; flex-shrink: 0; }
   display: flex; align-items: center; justify-content: center;
   z-index: 500;
   opacity: 0; pointer-events: none;
-  transition: opacity var(--transition);
+  transition: opacity 220ms var(--ease-out);
 }
 .modal-overlay.open { opacity: 1; pointer-events: all; }
 .modal {
@@ -299,10 +311,12 @@ nav a svg { width: 18px; height: 18px; flex-shrink: 0; }
   padding: 32px;
   width: 420px;
   max-width: 95vw;
-  transform: translateY(20px);
-  transition: transform var(--transition);
+  /* Modal stays centered (not origin-aware — modals don't have a trigger anchor) */
+  transform: scale(0.96) translateY(12px);
+  opacity: 0;
+  transition: transform 240ms var(--ease-out), opacity 240ms var(--ease-out);
 }
-.modal-overlay.open .modal { transform: translateY(0); }
+.modal-overlay.open .modal { transform: scale(1) translateY(0); opacity: 1; }
 .modal h3 { color: var(--white); margin-bottom: 20px; }
 
 /* ── Stat pill ───────────────────────────────────────────────────────────── */
@@ -372,9 +386,10 @@ nav a svg { width: 18px; height: 18px; flex-shrink: 0; }
   padding: 12px 20px;
   font-size: .88rem;
   box-shadow: var(--shadow);
-  transform: translateY(80px);
+  /* Enter from bottom edge, exit same edge (spatial consistency) */
+  transform: translateY(calc(100% + 32px));
   opacity: 0;
-  transition: all .3s ease;
+  transition: transform 280ms var(--ease-out), opacity 280ms var(--ease-out);
   z-index: 1000;
   max-width: 320px;
 }
@@ -421,7 +436,8 @@ nav a svg { width: 18px; height: 18px; flex-shrink: 0; }
   border: 2px solid rgba(34,197,94,0.15);
   border-top-color: var(--gold);
   border-radius: 50%;
-  animation: spin .7s linear infinite;
+  /* Faster spinner = app feels faster (perceived performance) */
+  animation: spin .55s linear infinite;
   display: inline-block;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -705,13 +721,20 @@ html[data-theme="zen"] {
 #more-backdrop {
   position: fixed; inset: 0; z-index: 89;
   background: rgba(0,0,0,.5);
+  opacity: 0;
+  transition: opacity 240ms var(--ease-out);
 }
+#more-backdrop.visible { opacity: 1; }
 #more-sheet {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
   background: var(--navy2); border-top: 1px solid var(--navy3);
   border-radius: 16px 16px 0 0;
   padding: 8px 8px calc(12px + env(safe-area-inset-bottom));
+  /* Drawer enters from bottom edge — iOS-like curve */
+  transform: translateY(100%);
+  transition: transform 300ms var(--ease-drawer);
 }
+#more-sheet.open { transform: translateY(0); }
 .more-sheet-handle {
   width: 36px; height: 4px; border-radius: 99px;
   background: var(--navy3); margin: 4px auto 10px;
@@ -815,10 +838,12 @@ html[data-theme="zen"] {
 .btn-icon {
   background: var(--navy2); border: 1px solid var(--navy3);
   color: var(--white); width: 40px; height: 40px; border-radius: 8px;
-  cursor: pointer; font-size: 1.2rem; transition: var(--transition);
+  cursor: pointer; font-size: 1.2rem;
+  transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out), transform 120ms var(--ease-out);
   display: flex; align-items: center; justify-content: center;
 }
 .btn-icon:hover { background: var(--navy3); color: var(--gold); }
+.btn-icon:active { transform: scale(0.93); }
 
 .tab-nav {
   display: flex; gap: 12px; margin-bottom: 24px; border-bottom: 1px solid var(--navy3);
@@ -828,7 +853,8 @@ html[data-theme="zen"] {
   background: none; border: 0; color: var(--muted);
   font-family: inherit; font-size: .95rem; font-weight: 500;
   padding: 12px 16px; cursor: pointer;
-  border-bottom: 3px solid transparent; transition: var(--transition);
+  border-bottom: 3px solid transparent;
+  transition: color var(--transition), border-color var(--transition);
 }
 .tab-btn:hover { color: var(--white); }
 .tab-btn.active {

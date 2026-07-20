@@ -137,14 +137,30 @@ const App = {
   _toggleMoreSheet() {
     const sheet = document.getElementById('more-sheet');
     const backdrop = document.getElementById('more-backdrop');
-    const isOpen = sheet.style.display === 'block';
-    sheet.style.display = isOpen ? 'none' : 'block';
-    backdrop.style.display = isOpen ? 'none' : 'block';
+    const isOpen = sheet.classList.contains('open');
+    if (isOpen) {
+      this._closeMoreSheet();
+    } else {
+      sheet.style.display = 'block';
+      backdrop.style.display = 'block';
+      // rAF ensures display:block is painted before transition fires
+      requestAnimationFrame(() => {
+        sheet.classList.add('open');
+        backdrop.classList.add('visible');
+      });
+    }
   },
 
   _closeMoreSheet() {
-    document.getElementById('more-sheet').style.display = 'none';
-    document.getElementById('more-backdrop').style.display = 'none';
+    const sheet = document.getElementById('more-sheet');
+    const backdrop = document.getElementById('more-backdrop');
+    sheet.classList.remove('open');
+    backdrop.classList.remove('visible');
+    // hide after transition completes (300ms drawer + buffer)
+    setTimeout(() => {
+      if (!sheet.classList.contains('open')) sheet.style.display = 'none';
+      if (!backdrop.classList.contains('visible')) backdrop.style.display = 'none';
+    }, 320);
   },
 
   navigate(page) {
