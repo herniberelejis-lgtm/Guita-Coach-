@@ -1,4 +1,10 @@
 /* Settings page — conexiones, presupuesto, perfil */
+// Prometeo pide usuario/contraseña del banco en un formulario propio (no un widget hosted
+// del proveedor), lo que Google Safe Browsing detecta como patrón de phishing/ingeniería
+// social y usó para marcar el dominio como sitio peligroso. Oculto la UI hasta confirmar
+// si Prometeo ofrece un flujo hosted (tipo Plaid Link) para reemplazar el login directo.
+const PROMETEO_UI_ENABLED = false;
+
 const Settings = {
   async render() {
     const main = document.getElementById('main');
@@ -58,9 +64,12 @@ const Settings = {
     main.appendChild(this._buildPlaidCard(plaidConnected, plaidStatus?.last_sync));
 
     // ── Prometeo (Open Banking - Argentina) ──────────────────────────────────
-    const prometeoStatus = syncStatus['prometeo'];
-    const prometeoConnected = prometeoStatus?.status === 'connected';
-    main.appendChild(this._buildPrometeoCard(prometeoConnected, prometeoStatus?.last_sync));
+    // Oculto temporalmente: ver nota PROMETEO_UI_ENABLED arriba.
+    if (PROMETEO_UI_ENABLED) {
+      const prometeoStatus = syncStatus['prometeo'];
+      const prometeoConnected = prometeoStatus?.status === 'connected';
+      main.appendChild(this._buildPrometeoCard(prometeoConnected, prometeoStatus?.last_sync));
+    }
 
     // ── Import CSV de MP ─────────────────────────────────────────────────────
     main.appendChild(this._buildCsvImportCard());
