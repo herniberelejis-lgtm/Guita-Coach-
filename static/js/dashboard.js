@@ -1,6 +1,6 @@
-/* Dashboard — franjas + alerts + ultimas transacciones */
+/* Dashboard — balance editable + distribución del gasto + histórico mensual */
 const Dashboard = {
-  async render() {
+  async render(month) {
     const main = document.getElementById('main');
     main.textContent = '';
     const spinner = document.createElement('div');
@@ -8,76 +8,22 @@ const Dashboard = {
     spinner.style.cssText = 'margin:80px auto;display:block;';
     main.appendChild(spinner);
 
-    const [budget, insights] = await Promise.all([
-      API.getBudget(),
-      API.getInsights().catch(() => null),
+    const [budget, months] = await Promise.all([
+      API.getBudget(month),
+      API.getBudgetMonths().catch(() => []),
     ]);
 
-    App.state.budget = budget;
-    App._updateAlertBadge(budget.alerts?.length || 0);
+    if (!month) {
+      App.state.budget = budget;
+      App._updateAlertBadge(budget.alerts?.length || 0);
+    }
 
     main.textContent = '';
-    main.appendChild(_buildDashboard(budget, insights));
-
-    this._loadSyncStatus();
-
-    API.getTransactions({ limit: 8 }).then(data => {
-      const wrap = document.getElementById('recent-txs-wrap');
-      if (!wrap) return;
-      wrap.textContent = '';
-      if (data.items.length) {
-        wrap.appendChild(_buildTxTable(data.items));
-      } else {
-        const empty = document.createElement('div');
-        empty.className = 'empty';
-        empty.textContent = 'Sin movimientos este mes';
-        wrap.appendChild(empty);
-      }
-    });
-
-    document.querySelectorAll('.alert-dismiss').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.dataset.id;
-        await API.markAlertRead(id).catch(() => {});
-        btn.closest('.alert-item').remove();
-      });
-    });
+    main.appendChild(_buildDashboard(budget, months));
   },
 
-  async syncAll(btn) {
-    btn.disabled = true;
-    btn.textContent = 'Sincronizando…';
-    try {
-      const status = App.state.syncStatus || {};
-      const tasks = [];
-      if (status.gmail?.status === 'connected') tasks.push(API.syncGmail());
-      if (status.mercadopago?.status === 'connected') tasks.push(API.syncMP());
-      if (!tasks.length) {
-        App.toast('Conectá Gmail o Mercado Pago primero', 'error');
-        return;
-      }
-      const results = await Promise.allSettled(tasks);
-      const saved = results.reduce((s, r) => s + (r.value?.saved || 0), 0);
-      App.toast('Sincronizado. ' + saved + ' transacciones nuevas.', 'success');
-      Dashboard.render();
-    } catch (err) {
-      App.toast(err.message, 'error');
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = '↻ Sincronizar'; }
-    }
-  },
-
-  async _loadSyncStatus() {
-    try {
-      const s = await API.syncStatus();
-      App.state.syncStatus = s;
-      const label = document.getElementById('sync-status-label');
-      if (!label) return;
-      const parts = Object.entries(s)
-        .filter(([, v]) => v.status === 'connected')
-        .map(([k]) => k === 'mercadopago' ? 'MP' : 'Gmail');
-      label.textContent = parts.length ? parts.join(' + ') + ' conectado' : 'Sin conexiones';
-    } catch (_) { /* ignore */ }
+  _changeMonth(month) {
+    Dashboard.render(month === _currentMonthStr() ? undefined : month);
   },
 };
 
@@ -96,285 +42,189 @@ function _el(tag, attrs = {}, ...children) {
   return el;
 }
 
-function _buildDashboard(budget, insights) {
-  const frag = document.createDocumentFragment();
-  const now = new Date();
-  const monthLabel = now.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+function _currentMonthStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
 
-  // Header
+function _monthLabel(m) {
+  const [y, mo] = m.split('-').map(Number);
+  const d = new Date(y, mo - 1, 1);
+  const label = d.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function _shortMonthLabel(m) {
+  const [y, mo] = m.split('-').map(Number);
+  const d = new Date(y, mo - 1, 1);
+  return d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '');
+}
+
+function _googleIcon() {
+  const span = document.createElement('span');
+  span.style.cssText = 'display:flex;align-items:center;';
+  span.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#EA4335" d="M12 5.4c1.7 0 3.2.6 4.4 1.7l3.3-3.3C17.7 1.9 15 .8 12 .8 7.4.8 3.4 3.4 1.5 7.2l3.8 3C6.3 7.4 8.9 5.4 12 5.4z"/><path fill="#4285F4" d="M23.5 12.3c0-.9-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.7-2.4 3.6l3.7 2.9c2.2-2 3.7-5 3.7-8.7z"/><path fill="#FBBC05" d="M5.3 14.3a7 7 0 0 1 0-4.2l-3.8-3a11.2 11.2 0 0 0 0 10.2l3.8-3z"/><path fill="#34A853" d="M12 23.2c3 0 5.6-1 7.5-2.7l-3.7-2.9c-1 .7-2.3 1.1-3.8 1.1-3.1 0-5.7-2-6.7-4.8l-3.8 3c1.9 3.8 5.9 6.3 10.5 6.3z"/></svg>';
+  return span;
+}
+
+function _buildDashboard(budget, months) {
+  const frag = document.createDocumentFragment();
+
+  // Header: saludo + botón "conectar cuentas" (estilo Google Sign-In)
+  const subtitle = budget.is_current_month
+    ? _monthLabel(budget.month) + ' · día ' + budget.days_passed + ' de ' + budget.days_in_month
+    : _monthLabel(budget.month) + ' · mes cerrado';
+
   const header = _el('div', { className: 'page-header' },
     _el('div', {},
       _el('h2', {}, 'Hola, ' + (budget.name || 'Hernán')),
-      _el('p', { style: 'color:var(--muted);font-size:.88rem;margin-top:2px;' },
-        monthLabel + ' · día ' + budget.days_passed + ' de ' + budget.days_in_month)
+      _el('p', { style: 'color:var(--muted);font-size:.88rem;margin-top:2px;' }, subtitle)
     ),
-    _el('div', { style: 'display:flex;gap:10px;align-items:center;' },
-      _el('span', { className: 'sync-badge', id: 'sync-status-label' }, '···'),
-      _el('button', {
-        className: 'btn btn-primary btn-sm',
-        onclick: function() { Dashboard.syncAll(this); }
-      }, '↻ Sincronizar')
-    )
+    _el('button', {
+      className: 'google-connect-btn',
+      onclick: () => App.navigate('settings')
+    }, _googleIcon(), 'Conectar cuentas')
   );
   frag.appendChild(header);
 
-  // Connection banners (Gmail / Mercado Pago)
-  const syncStatus = App.state.syncStatus || {};
-  const gmail = syncStatus.gmail?.status === 'connected';
-  const mp = syncStatus.mercadopago?.status === 'connected';
-  if (!gmail || !mp) {
-    const banner = _el('div', { style: 'background:var(--color-bg-secondary);border-left:4px solid var(--color-accent);padding:16px;border-radius:6px;margin-bottom:20px;' });
-    const msg = _el('p', { style: 'margin:0;font-weight:500;margin-bottom:8px;' },
-      !gmail && !mp ? 'Conectá Gmail y Mercado Pago para sincronizar transacciones' :
-      !gmail ? 'Conectá Gmail para sincronizar correos' :
-      'Conectá Mercado Pago para sincronizar pagos'
-    );
-    banner.appendChild(msg);
-
-    const btns = _el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;' });
-    if (!gmail) btns.appendChild(_el('button', {
-      className: 'btn btn-sm btn-primary',
-      onclick: () => App.navigate('settings')
-    }, '⚙ Conectar Gmail'));
-    if (!mp) btns.appendChild(_el('button', {
-      className: 'btn btn-sm btn-primary',
-      onclick: () => App.navigate('settings')
-    }, '💳 Conectar Mercado Pago'));
-    banner.appendChild(btns);
-    frag.appendChild(banner);
-  }
-
-  // Fixed expenses banner
-  const recurringCount = budget.monthly_committed || 0;
-  if (recurringCount === 0) {
-    const fixedBanner = _el('div', { style: 'background:var(--color-bg-secondary);border-left:4px solid var(--color-accent);padding:16px;border-radius:6px;margin-bottom:20px;' });
-    fixedBanner.appendChild(_el('p', { style: 'margin:0;font-weight:500;margin-bottom:8px;' }, 'Agregá gastos fijos para un presupuesto más preciso'));
-    const fixedBtn = _el('button', {
-      className: 'btn btn-sm btn-primary',
-      onclick: () => App.navigate('settings')
-    }, '➕ Agregar gasto fijo');
-    fixedBanner.appendChild(fixedBtn);
-    frag.appendChild(fixedBanner);
-  }
-
-  // Summary metrics card
-  const summaryCard = _el('div', { className: 'summary-metrics' });
-  const incomeSub = budget.income_is_declared
-    ? 'sueldo declarado · ' + App.fmt(budget.tracked_income || 0) + ' registrado'
-    : null;
-  [
-    { label: 'Ingresos', value: App.fmt(budget.total_income || 0), cls: 'income', sub: incomeSub },
-    { label: 'Egresos', value: App.fmt(budget.total_expenses || 0), cls: 'expense' },
-    { label: 'Balance', value: App.fmt(budget.balance || 0), cls: (budget.balance || 0) >= 0 ? 'positive' : 'negative' },
-    { label: 'Pendientes', value: String(budget.pending_count || 0), cls: 'pending' },
-  ].forEach(function(m) {
-    summaryCard.appendChild(_el('div', { className: 'metric-box ' + m.cls },
-      _el('span', { className: 'metric-label' }, m.label),
-      _el('span', { className: 'metric-value' }, m.value),
-      m.sub ? _el('span', { className: 'metric-sub' }, m.sub) : null
-    ));
+  // Selector de mes
+  const monthRow = _el('div', { className: 'month-select-row' },
+    _el('label', { style: 'font-size:.78rem;color:var(--muted);' }, 'Mes:')
+  );
+  const select = document.createElement('select');
+  select.className = 'month-select';
+  months.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = _monthLabel(m) + (m === _currentMonthStr() ? ' (actual)' : '');
+    if (m === budget.month) opt.selected = true;
+    select.appendChild(opt);
   });
-  frag.appendChild(summaryCard);
+  select.addEventListener('change', () => Dashboard._changeMonth(select.value));
+  monthRow.appendChild(select);
+  frag.appendChild(monthRow);
 
-  // Franjas
-  const grid = _el('div', { className: 'grid-3', style: 'margin-bottom:24px;' });
-  budget.franjas.forEach(f => grid.appendChild(_buildFranjaCard(f)));
-  frag.appendChild(grid);
+  // Balance editable + distribución por franja + límite de gasto mensual
+  frag.appendChild(_buildOverviewCard(budget));
 
-  // Charts: donut por franja + histórico
+  // Distribución del gasto (torta) + gasto mes a mes (barras apiladas)
   const chartsRow = _el('div', { className: 'charts-row' },
     _el('div', { className: 'card chart-card' },
       _el('p', { className: 'section-title' }, 'Distribución del gasto'),
       _buildDonut(budget.franjas)
     ),
     _el('div', { className: 'card chart-card' },
-      _el('p', { className: 'section-title' }, 'Últimos meses'),
-      _el('div', { id: 'history-chart' },
+      _el('p', { className: 'section-title' }, 'Gasto mes a mes'),
+      _el('div', { id: 'monthly-vbar-chart' },
         (() => { const s = document.createElement('div'); s.className = 'spinner'; s.style.cssText = 'display:block;margin:30px auto;'; return s; })()
       )
     )
   );
   frag.appendChild(chartsRow);
   API.getBudgetHistory().then(hist => {
-    const wrap = document.getElementById('history-chart');
-    if (wrap) { wrap.textContent = ''; wrap.appendChild(_buildHistoryBars(hist)); }
+    const wrap = document.getElementById('monthly-vbar-chart');
+    if (wrap) { wrap.textContent = ''; wrap.appendChild(_buildMonthlyStackedChart(hist)); }
   }).catch(() => {});
-
-  // Desglose por categoría (estilo MP)
-  const catCard = _el('div', { className: 'card', style: 'margin-bottom:24px;' },
-    _el('p', { className: 'section-title' }, 'Salidas por categoría'),
-    _el('div', { id: 'cat-breakdown' },
-      (() => { const s = document.createElement('div'); s.className = 'spinner'; s.style.cssText = 'display:block;margin:20px auto;'; return s; })()
-    )
-  );
-  frag.appendChild(catCard);
-  API.getCategories().then(data => {
-    const wrap = document.getElementById('cat-breakdown');
-    if (wrap) { wrap.textContent = ''; wrap.appendChild(_buildCategoryList(data)); }
-  }).catch(() => {});
-
-  // Desglose por medio de pago
-  const pmCard = _el('div', { className: 'card', style: 'margin-bottom:24px;' },
-    _el('p', { className: 'section-title' }, 'Gastos por medio de pago'),
-    _el('div', { id: 'pm-breakdown' },
-      (() => { const s = document.createElement('div'); s.className = 'spinner'; s.style.cssText = 'display:block;margin:20px auto;'; return s; })()
-    )
-  );
-  frag.appendChild(pmCard);
-  API.getPaymentMethods().then(data => {
-    const wrap = document.getElementById('pm-breakdown');
-    if (wrap) { wrap.textContent = ''; wrap.appendChild(_buildPaymentMethodList(data)); }
-  }).catch(() => {});
-
-  // Alerts
-  if (budget.alerts?.length) {
-    const alertsSection = _el('div', { style: 'margin-bottom:24px;' },
-      _el('p', { className: 'section-title' }, 'Alertas'),
-      _buildAlertsList(budget.alerts)
-    );
-    frag.appendChild(alertsSection);
-  }
-
-  // Insights
-  if (insights) {
-    const statsGrid = _el('div', { className: 'grid-3', style: 'margin-bottom:24px;' },
-      _statPill(App.fmt(insights.total_spent), 'Gastado este mes'),
-      _statPill(budget.days_remaining + ' días', 'Hasta fin de mes'),
-      _statPill(App.fmt(insights.income - insights.total_spent), 'Disponible total')
-    );
-    frag.appendChild(statsGrid);
-  }
-
-  // Investments card
-  const investCard = _el('div', { className: 'card', style: 'margin-bottom:24px;' },
-    _el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;' },
-      _el('p', { className: 'section-title', style: 'margin:0;' }, 'Inversiones'),
-      _el('a', {
-        href: '#',
-        onclick: function(e) { e.preventDefault(); App.navigate('investments'); }
-      }, 'Ver detalles →')
-    ),
-    _el('div', { id: 'investments-summary' },
-      (() => { const s = document.createElement('div'); s.className = 'spinner'; s.style.cssText = 'display:block;margin:20px auto;'; return s; })()
-    )
-  );
-  frag.appendChild(investCard);
-
-  API.getInvestmentSummary().then(inv => {
-    const wrap = document.getElementById('investments-summary');
-    if (!wrap) return;
-    wrap.textContent = '';
-    if (inv && inv.total_invested > 0) {
-      wrap.appendChild(_buildInvestmentSummary(inv));
-    } else {
-      const empty = _el('div', { className: 'empty', style: 'padding:20px;text-align:center;' });
-      empty.textContent = 'Sin inversiones aún. Sube un CSV de tu broker.';
-      wrap.appendChild(empty);
-    }
-  }).catch(() => {
-    const wrap = document.getElementById('investments-summary');
-    if (wrap) {
-      wrap.textContent = '';
-      const msg = _el('div', { className: 'empty', style: 'padding:20px;text-align:center;font-size:.9rem;color:var(--muted);' });
-      msg.textContent = 'No se pudo cargar inversiones';
-      wrap.appendChild(msg);
-    }
-  });
-
-  // Recent transactions card
-  const card = _el('div', { className: 'card' });
-  const cardHeader = _el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;' },
-    _el('p', { className: 'section-title', style: 'margin:0;' }, 'Últimos movimientos'),
-    _el('a', {
-      href: '#',
-      onclick: function(e) { e.preventDefault(); App.navigate('transactions'); }
-    }, 'Ver todos →')
-  );
-  card.appendChild(cardHeader);
-  const txWrap = _el('div', { id: 'recent-txs-wrap' });
-  const spin = document.createElement('div');
-  spin.className = 'spinner';
-  spin.style.cssText = 'display:block;margin:20px auto;';
-  txWrap.appendChild(spin);
-  card.appendChild(txWrap);
-  frag.appendChild(card);
 
   return frag;
 }
 
-function _buildFranjaCard(f) {
-  const cls = App.progressClass(f.usage_pct);
-  const card = _el('div', { className: 'franja-card' },
-    _el('div', { className: 'label' }, f.label),
-    _el('div', { className: 'amounts' },
-      _el('span', { className: 'spent' }, App.fmt(f.spent)),
-      _el('span', { className: 'limit' }, '/ ' + App.fmt(f.limit))
-    ),
-    _el('div', { className: 'progress-track' },
-      _el('div', {
-        className: 'progress-fill ' + cls,
-        style: 'width:' + Math.min(100, f.usage_pct) + '%'
-      })
-    ),
-    _el('div', { className: 'franja-pct' }, f.usage_pct + '% usado · ' + App.fmt(f.remaining) + ' restante')
+function _buildOverviewCard(budget) {
+  const card = _el('div', { className: 'card', style: 'margin-bottom:24px;' });
+  const top = _el('div', { className: 'balance-overview-top' },
+    _buildBalanceBlock(budget),
+    _buildFranjaBars(budget.franjas)
   );
+  card.appendChild(top);
+  card.appendChild(_buildLimitBar(budget));
   return card;
 }
 
-function _buildAlertsList(alerts) {
-  const wrap = _el('div', { id: 'alerts-list' });
-  const icons = { critical: '\u{1F534}', warning: '\u{1F7E1}', info: '\u{1F7E2}' };
-  alerts.forEach(a => {
-    let splitActions = null;
-    if (a.type === 'split_suggestion' && a.payload) {
-      let p = null;
-      try { p = JSON.parse(a.payload); } catch (_) { /* payload corrupto: sin botones */ }
-      if (p && p.expense_id && p.income_ids) {
-        splitActions = _el('div', { className: 'split-actions' },
-          _el('button', {
-            className: 'btn btn-primary btn-sm',
-            onclick: async function() {
-              this.disabled = true;
-              try {
-                const r = await API.confirmSplit(p.expense_id, { income_ids: p.income_ids, alert_id: a.id });
-                App.toast('Listo: gasto neto ' + App.fmt(r.net_expense) + ' (te devolvieron ' + App.fmt(r.reimbursed_total) + ')', 'success');
-                Dashboard.render();
-              } catch (err) {
-                App.toast(err.message, 'error');
-                this.disabled = false;
-              }
-            }
-          }, 'Sí, era compartido'),
-          _el('button', {
-            className: 'btn btn-sm btn-ghost',
-            onclick: async function() {
-              await API.markAlertRead(a.id).catch(() => {});
-              this.closest('.alert-item').remove();
-            }
-          }, 'No, dejar como está')
-        );
-      }
-    }
-    const item = _el('div', { className: 'alert-item ' + a.severity },
-      _el('span', { className: 'alert-icon' }, a.type === 'split_suggestion' ? '🤝' : (icons[a.severity] || '⚠️')),
-      _el('div', { style: 'flex:1' },
-        _el('div', { className: 'alert-msg' }, a.message),
-        ...(a.ai_advice ? [_el('div', { className: 'alert-advice' }, a.ai_advice)] : []),
-        ...(splitActions ? [splitActions] : [])
-      ),
-      _el('button', {
-        className: 'alert-dismiss',
-        'data-id': a.id,
-        title: 'Marcar leída',
-        onclick: async function() {
-          await API.markAlertRead(a.id).catch(() => {});
-          item.remove();
+function _buildBalanceBlock(budget) {
+  const wrap = _el('div', { className: 'balance-block' },
+    _el('span', { className: 'metric-label' }, 'Balance actual')
+  );
+  const displayRow = _el('div', { className: 'balance-value-row', id: 'balance-display-row' },
+    _el('span', { className: 'balance-value' + ((budget.balance || 0) < 0 ? ' negative' : '') }, App.fmt(budget.balance)),
+    _el('button', {
+      className: 'balance-icon-btn',
+      title: 'Editar balance',
+      onclick: () => _enterBalanceEdit(budget)
+    }, '✎')
+  );
+  wrap.appendChild(displayRow);
+  wrap.appendChild(_el('span', { style: 'font-size:.78rem;color:var(--muted);' }, 'Editable a mano para ajustes de cash'));
+  return wrap;
+}
+
+function _enterBalanceEdit(budget) {
+  const row = document.getElementById('balance-display-row');
+  if (!row) return;
+  row.textContent = '';
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.step = '0.01';
+  input.value = budget.balance || 0;
+
+  const reload = () => Dashboard.render(budget.is_current_month ? undefined : budget.month);
+
+  const form = _el('div', { className: 'balance-edit-form' },
+    input,
+    _el('button', {
+      className: 'btn btn-primary btn-sm',
+      onclick: async function() {
+        const val = parseFloat(input.value);
+        if (Number.isNaN(val)) { App.toast('Ingresá un número válido', 'error'); return; }
+        this.disabled = true;
+        try {
+          await API.updateBalance(val);
+          App.toast('Balance actualizado', 'success');
+          reload();
+        } catch (err) {
+          App.toast(err.message, 'error');
+          this.disabled = false;
         }
-      }, '✕')
-    );
-    wrap.appendChild(item);
+      }
+    }, 'Guardar'),
+    _el('button', { className: 'btn btn-ghost btn-sm', onclick: reload }, 'Cancelar')
+  );
+  row.appendChild(form);
+  input.focus();
+  input.select();
+}
+
+function _buildFranjaBars(franjas) {
+  const wrap = _el('div', { className: 'franja-bars' },
+    _el('span', { className: 'metric-label' }, 'Distribución del gasto mensual')
+  );
+  const total = franjas.reduce((s, f) => s + f.spent, 0);
+  franjas.forEach(f => {
+    const pct = total > 0 ? (f.spent / total * 100) : 0;
+    wrap.appendChild(_el('div', { className: 'franja-bar-row' },
+      _el('span', { className: 'franja-bar-label' }, f.label),
+      _el('div', { className: 'franja-bar-track' },
+        _el('div', { className: 'franja-bar-fill', style: 'width:' + pct + '%;background:' + (FRANJA_COLORS[f.name] || '#888') })
+      ),
+      _el('span', { className: 'franja-bar-amount' }, App.fmt(f.spent))
+    ));
   });
   return wrap;
+}
+
+function _buildLimitBar(budget) {
+  const limit = budget.total_income || 0;
+  const spent = budget.total_expenses || 0;
+  const pct = limit > 0 ? Math.min(100, spent / limit * 100) : 0;
+  const cls = App.progressClass(limit > 0 ? spent / limit * 100 : 0);
+  return _el('div', { className: 'limit-bar-wrap' },
+    _el('div', { className: 'limit-bar-labels' },
+      _el('span', {}, 'Límite de gasto mensual'),
+      _el('span', {}, App.fmt(spent) + ' / ' + App.fmt(limit))
+    ),
+    _el('div', { className: 'limit-bar-track' },
+      _el('div', { className: 'limit-bar-fill progress-fill ' + cls, style: 'width:' + pct + '%' })
+    )
+  );
 }
 
 const FRANJA_COLORS = { necesidades: '#5B8DEF', gustos: '#C8A84B', ahorro: '#4CAF8C' };
@@ -423,153 +273,47 @@ function _buildDonut(franjas) {
   return wrap;
 }
 
-/* Barras horizontales apiladas por mes (histórico). */
-function _buildHistoryBars(hist) {
+/* Barras verticales apiladas por mes: 3 segmentos (necesidades/gustos/ahorro), colores de marca. */
+function _buildMonthlyStackedChart(hist) {
   if (!hist || !hist.length) {
     return _el('div', { className: 'empty' }, 'Todavía no hay histórico');
   }
   const months = hist.slice(0, 6).reverse();
   const max = Math.max(...months.map(m => m.franjas.reduce((s, f) => s + f.spent, 0)), 1);
-  const wrap = _el('div', { className: 'history-bars' });
+  const BAR_AREA_PX = 130;
+
+  const wrap = _el('div', {});
+  const chart = _el('div', { className: 'vbar-chart' });
   months.forEach(m => {
-    const totalSpent = m.franjas.reduce((s, f) => s + f.spent, 0);
-    const bar = _el('div', { className: 'hbar-track' });
+    const total = m.franjas.reduce((s, f) => s + f.spent, 0);
+    const stack = _el('div', {
+      className: 'vbar-stack',
+      style: 'height:' + Math.max(total / max * BAR_AREA_PX, total > 0 ? 2 : 0) + 'px'
+    });
     m.franjas.forEach(f => {
       if (f.spent <= 0) return;
-      bar.appendChild(_el('div', {
-        className: 'hbar-seg',
-        style: 'width:' + (f.spent / max * 100) + '%;background:' + (FRANJA_COLORS[f.name] || '#888'),
+      const segPct = total > 0 ? (f.spent / total * 100) : 0;
+      stack.appendChild(_el('div', {
+        className: 'vbar-seg',
+        style: 'height:' + segPct + '%;background:' + (FRANJA_COLORS[f.name] || '#888'),
         title: f.label + ': ' + App.fmt(f.spent),
       }));
     });
-    wrap.appendChild(_el('div', { className: 'hbar-row' },
-      _el('span', { className: 'hbar-label' }, m.month),
-      bar,
-      _el('span', { className: 'hbar-total' }, App.fmt(totalSpent))
+    chart.appendChild(_el('div', { className: 'vbar-col' },
+      _el('span', { className: 'vbar-total' }, App.fmt(total)),
+      _el('div', { className: 'vbar-bar-area' }, stack),
+      _el('span', { className: 'vbar-label' }, _shortMonthLabel(m.month))
     ));
   });
+  wrap.appendChild(chart);
+
+  const legend = _el('div', { className: 'vbar-legend' });
+  [['necesidades', 'Necesidades'], ['gustos', 'Gustos'], ['ahorro', 'Ahorro']].forEach(([k, label]) => {
+    legend.appendChild(_el('div', { className: 'legend-item' },
+      _el('span', { className: 'legend-dot', style: 'background:' + FRANJA_COLORS[k] }),
+      _el('span', {}, label)
+    ));
+  });
+  wrap.appendChild(legend);
   return wrap;
-}
-
-const CAT_PALETTE = ['#84A98C', '#C97B4A', '#5B8DEF', '#B07BAC', '#D4A03C', '#6FA8A0', '#A0674B', '#8A9182'];
-
-/* Lista de subcategorías con barra proporcional, estilo app de MP. */
-function _buildCategoryList(data) {
-  if (!data.categories || !data.categories.length) {
-    return _el('div', { className: 'empty' }, 'Sin gastos este mes');
-  }
-  const wrap = _el('div', { className: 'cat-list' });
-  data.categories.slice(0, 10).forEach((c, i) => {
-    const color = c.name === 'Pendiente de categoría' ? '#9AA0A6' : CAT_PALETTE[i % CAT_PALETTE.length];
-    wrap.appendChild(_el('div', { className: 'cat-row' },
-      _el('span', { className: 'cat-dot', style: 'background:' + color }),
-      _el('div', { className: 'cat-info' },
-        _el('div', { className: 'cat-name' }, c.name),
-        _el('div', { className: 'cat-bar-track' },
-          _el('div', { className: 'cat-bar', style: 'width:' + c.pct + '%;background:' + color })
-        )
-      ),
-      _el('div', { className: 'cat-amounts' },
-        _el('div', { className: 'cat-amount' }, App.fmt(c.amount)),
-        _el('div', { className: 'cat-pct' }, c.pct + '% · ' + c.count + ' movs')
-      )
-    ));
-  });
-  wrap.appendChild(_el('div', { className: 'cat-total' },
-    _el('span', {}, 'Total del mes'),
-    _el('strong', {}, App.fmt(data.total))
-  ));
-  return wrap;
-}
-
-const PM_COLORS = {
-  credito: '#C97B4A', debito: '#5B8DEF', qr: '#5E8C6A',
-  transferencia: '#A855F7', efectivo: '#22C55E', otro: '#9AA0A6',
-};
-
-/* Desglose de gastos por medio de pago (barra proporcional). */
-function _buildPaymentMethodList(data) {
-  if (!data.methods || !data.methods.length) {
-    return _el('div', { className: 'empty' }, 'Sin gastos con medio de pago este mes');
-  }
-  const wrap = _el('div', { className: 'cat-list' });
-  data.methods.forEach(m => {
-    const color = PM_COLORS[m.method] || '#9AA0A6';
-    wrap.appendChild(_el('div', { className: 'cat-row' },
-      _el('span', { className: 'cat-dot', style: 'background:' + color }),
-      _el('div', { className: 'cat-info' },
-        _el('div', { className: 'cat-name' }, m.label),
-        _el('div', { className: 'cat-bar-track' },
-          _el('div', { className: 'cat-bar', style: 'width:' + m.pct + '%;background:' + color })
-        )
-      ),
-      _el('div', { className: 'cat-amounts' },
-        _el('div', { className: 'cat-amount' }, App.fmt(m.amount)),
-        _el('div', { className: 'cat-pct' }, m.pct + '% · ' + m.count + ' movs')
-      )
-    ));
-  });
-  wrap.appendChild(_el('div', { className: 'cat-total' },
-    _el('span', {}, 'Total con medio identificado'),
-    _el('strong', {}, App.fmt(data.total))
-  ));
-  return wrap;
-}
-
-function _statPill(val, lbl) {
-  return _el('div', { className: 'stat-pill' },
-    _el('div', {},
-      _el('div', { className: 'val' }, val),
-      _el('div', { className: 'lbl' }, lbl)
-    )
-  );
-}
-
-function _buildTxTable(items) {
-  const table = _el('table', { className: 'tx-table' });
-  const thead = _el('thead', {},
-    _el('tr', {},
-      _el('th', {}, 'Comercio'),
-      _el('th', {}, 'Categoría'),
-      _el('th', {}, 'Fecha'),
-      _el('th', { style: 'text-align:right' }, 'Monto')
-    )
-  );
-  table.appendChild(thead);
-  const tbody = document.createElement('tbody');
-  items.forEach(t => {
-    let cls = t.needs_review ? 'review' : t.category;
-    let label = t.needs_review ? '? revisar' : t.category;
-    if (t.is_internal_transfer) { cls = 'transfer'; label = 'transferencia propia'; }
-    else if (t.is_duplicate)    { cls = 'duplicate'; label = 'duplicado'; }
-    tbody.appendChild(_el('tr', {},
-      _el('td', {}, t.merchant),
-      _el('td', {}, _el('span', { className: 'badge ' + cls }, label)),
-      _el('td', { style: 'color:var(--muted)' }, t.date),
-      _el('td', { style: 'text-align:right;font-weight:600' }, App.fmt(t.amount))
-    ));
-  });
-  table.appendChild(tbody);
-  return table;
-}
-
-function _buildInvestmentSummary(inv) {
-  const grid = _el('div', { className: 'grid-3', style: 'margin-top:12px;' },
-    _el('div', { className: 'metric-box' },
-      _el('span', { className: 'metric-label' }, 'Invertido'),
-      _el('span', { className: 'metric-value', style: 'color:var(--info)' }, App.fmt(inv.total_invested))
-    ),
-    _el('div', { className: 'metric-box' },
-      _el('span', { className: 'metric-label' }, 'Valor actual'),
-      _el('span', { className: 'metric-value' }, App.fmt(inv.total_current_value))
-    ),
-    _el('div', { className: 'metric-box' },
-      _el('span', { className: 'metric-label' }, 'P&L'),
-      _el('span', {
-        className: 'metric-value',
-        style: 'color:' + (inv.total_pnl >= 0 ? 'var(--success)' : 'var(--error)')
-      }, (inv.total_pnl >= 0 ? '+' : '') + App.fmt(inv.total_pnl))
-    )
-  );
-  return grid;
 }
