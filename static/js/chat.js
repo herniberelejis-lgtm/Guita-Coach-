@@ -1,162 +1,202 @@
-/* Chat Asesor — pantalla de chat con asesor financiero */
-var _chatHistory = [];
+/* Floating AI chat widget */
+const _chatHistory = [];
 
-const Chat = {
-  async render() {
-    const main = document.getElementById('main');
-    main.textContent = '';
+const ChatWidget = {
+  _isOpen: false,
+  _ready: false,
+  _dragging: false,
 
+  init() {
     const wrap = document.createElement('div');
-    wrap.style.cssText = 'display:flex;flex-direction:column;height:calc(100vh - 120px);';
+    wrap.id = 'chat-widget';
+    wrap.innerHTML = `
+      <button id="cw-btn" title="Asesor IA" aria-label="Abrir asesor financiero">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="22" height="22">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+      </button>
+      <div id="cw-panel" style="display:none">
+        <div id="cw-header">
+          <div id="cw-header-left">
+            <div id="cw-avatar">G</div>
+            <div>
+              <div id="cw-name">Guita Coach</div>
+              <div id="cw-status-line"><span class="cw-dot"></span> En línea</div>
+            </div>
+          </div>
+          <div id="cw-header-actions">
+            <button id="cw-min" title="Minimizar">—</button>
+            <button id="cw-cls" title="Cerrar">✕</button>
+          </div>
+        </div>
+        <div id="cw-messages"></div>
+        <div id="cw-footer">
+          <input id="cw-input" type="text" placeholder="Escribí tu consulta…" autocomplete="off">
+          <button id="cw-send" aria-label="Enviar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="15" height="15">
+              <line x1="22" y1="2" x2="11" y2="13"/>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(wrap);
 
-    // Header
-    const header = document.createElement('div');
-    header.className = 'page-header';
-    const hLeft = document.createElement('div');
-    const h2 = document.createElement('h2');
-    h2.textContent = 'Asesor Financiero';
-    const sub = document.createElement('p');
-    sub.style.cssText = 'color:var(--muted);font-size:.82rem;margin-top:2px;';
-    sub.textContent = 'Prioridades: deudas → fondo emergencia → inversion diversificada';
-    hLeft.appendChild(h2);
-    hLeft.appendChild(sub);
-    header.appendChild(hLeft);
-    wrap.appendChild(header);
-
-    // Messages area
-    const messages = document.createElement('div');
-    messages.id = 'chat-messages';
-    messages.style.cssText = 'flex:1;overflow-y:auto;padding:16px 0;display:flex;flex-direction:column;gap:12px;';
-    wrap.appendChild(messages);
-
-    // Input area
-    const inputArea = document.createElement('div');
-    inputArea.style.cssText = 'display:flex;gap:8px;padding:16px 0 8px;border-top:1px solid rgba(255,255,255,.08);margin-top:8px;';
-
-    const input = document.createElement('input');
-    input.id = 'chat-input';
-    input.type = 'text';
-    input.placeholder = 'Escribi tu consulta...';
-    input.style.cssText = 'flex:1;background:var(--navy2);border:1px solid rgba(255,255,255,.1);color:var(--white);padding:12px 16px;border-radius:10px;font-size:.9rem;outline:none;';
-    input.setAttribute('autocomplete', 'off');
-
-    const sendBtn = document.createElement('button');
-    sendBtn.id = 'chat-send-btn';
-    sendBtn.className = 'btn btn-primary';
-    sendBtn.textContent = 'Enviar';
-
-    inputArea.appendChild(input);
-    inputArea.appendChild(sendBtn);
-    wrap.appendChild(inputArea);
-    main.appendChild(wrap);
-
-    // Reset history on fresh render
-    _chatHistory = [];
-
-    // Load starters
-    this._loadStarters(messages);
-
-    // Wire up input
-    sendBtn.addEventListener('click', function() {
-      const val = input.value.trim();
-      if (val) { input.value = ''; Chat._send(val); }
+    document.getElementById('cw-btn').addEventListener('click', () => {
+      if (!this._dragging) this.toggle();
     });
-    input.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        const val = input.value.trim();
-        if (val) { input.value = ''; Chat._send(val); }
-      }
+    document.getElementById('cw-min').addEventListener('click', () => this.close());
+    document.getElementById('cw-cls').addEventListener('click', () => this.close());
+    document.getElementById('cw-send').addEventListener('click', () => this._send());
+    document.getElementById('cw-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this._send(); }
     });
+    this._makeDraggable();
   },
 
-  async _loadStarters(container) {
+  toggle() { this._isOpen ? this.close() : this.open(); },
+
+  open() {
+    this._isOpen = true;
+    const panel = document.getElementById('cw-panel');
+    panel.style.display = 'flex';
+    panel.style.flexDirection = 'column';
+    if (!this._ready) {
+      this._bubble('assistant',
+        '¡Hola! Soy tu asesor financiero de Guita Coach.\n\n' +
+        'Podés preguntarme sobre tu presupuesto, gastos, inversiones o cualquier duda de finanzas personales.'
+      );
+      this._ready = true;
+      this._loadStarters();
+    }
+    setTimeout(() => document.getElementById('cw-input')?.focus(), 150);
+  },
+
+  close() {
+    this._isOpen = false;
+    const panel = document.getElementById('cw-panel');
+    if (panel) panel.style.display = 'none';
+  },
+
+  _bubble(role, text) {
+    const msgs = document.getElementById('cw-messages');
+    if (!msgs) return null;
+    const b = document.createElement('div');
+    b.className = 'cw-bubble ' + role;
+    b.textContent = text;
+    msgs.appendChild(b);
+    msgs.scrollTop = msgs.scrollHeight;
+    return b;
+  },
+
+  async _loadStarters() {
     try {
-      const data = await API.get('/chat/starters');
-      const intro = document.createElement('div');
-      intro.style.cssText = 'text-align:center;color:var(--muted);font-size:.85rem;padding:12px 0 8px;';
-      intro.textContent = 'Hola! Soy tu asesor financiero. En que te ayudo hoy?';
-      container.appendChild(intro);
-
-      const startersWrap = document.createElement('div');
-      startersWrap.id = 'chat-starters';
-      startersWrap.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
-
-      (data.starters || []).forEach(function(s) {
+      const data = await fetch('/api/chat/starters').then(r => r.json());
+      const msgs = document.getElementById('cw-messages');
+      if (!msgs || !data.starters?.length) return;
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;margin-top:2px;';
+      data.starters.slice(0, 3).forEach(s => {
         const btn = document.createElement('button');
-        btn.style.cssText = 'background:var(--navy2);border:1px solid rgba(255,255,255,.1);color:var(--muted);padding:12px 16px;border-radius:10px;cursor:pointer;text-align:left;font-size:.88rem;';
+        btn.className = 'cw-starter';
         btn.textContent = s;
-        btn.addEventListener('mouseover', function() { btn.style.borderColor = 'var(--gold)'; btn.style.color = 'var(--white)'; });
-        btn.addEventListener('mouseout', function() { btn.style.borderColor = 'rgba(255,255,255,.1)'; btn.style.color = 'var(--muted)'; });
-        btn.addEventListener('click', function() {
-          const starters = document.getElementById('chat-starters');
-          if (starters) starters.remove();
-          Chat._send(s);
+        btn.addEventListener('click', () => {
+          wrap.remove();
+          document.getElementById('cw-input').value = s;
+          this._send();
         });
-        startersWrap.appendChild(btn);
+        wrap.appendChild(btn);
       });
-
-      container.appendChild(startersWrap);
+      msgs.appendChild(wrap);
+      msgs.scrollTop = msgs.scrollHeight;
     } catch (_) {}
   },
 
-  _appendBubble(role, text) {
-    const container = document.getElementById('chat-messages');
-    if (!container) return;
+  async _send() {
+    const inp = document.getElementById('cw-input');
+    const msg = (inp?.value || '').trim();
+    if (!msg) return;
+    inp.value = '';
 
-    const bubble = document.createElement('div');
-    const isUser = role === 'user';
-    bubble.style.cssText = [
-      'max-width:80%;padding:12px 16px;border-radius:14px;font-size:.88rem;line-height:1.55;',
-      isUser
-        ? 'align-self:flex-end;background:var(--gold);color:var(--bg);border-bottom-right-radius:4px;margin-left:auto;'
-        : 'align-self:flex-start;background:var(--navy2);color:var(--white);border-bottom-left-radius:4px;border:1px solid rgba(255,255,255,.06);',
-    ].join('');
-    bubble.textContent = text;
-    container.appendChild(bubble);
-    container.scrollTop = container.scrollHeight;
-    return bubble;
-  },
+    this._bubble('user', msg);
+    _chatHistory.push({ role: 'user', content: msg });
 
-  async _send(text) {
-    this._appendBubble('user', text);
-    _chatHistory.push({ role: 'user', content: text });
-
-    // Typing indicator
-    const container = document.getElementById('chat-messages');
-    const typing = document.createElement('div');
-    typing.id = 'chat-typing';
-    typing.style.cssText = 'align-self:flex-start;background:var(--navy2);border:1px solid rgba(255,255,255,.06);border-radius:14px;border-bottom-left-radius:4px;padding:12px 16px;color:var(--muted);font-size:.88rem;';
-    typing.textContent = '...';
-    if (container) { container.appendChild(typing); container.scrollTop = container.scrollHeight; }
-
-    // Disable input while waiting
-    const input = document.getElementById('chat-input');
-    const btn = document.getElementById('chat-send-btn');
-    if (input) input.disabled = true;
-    if (btn) btn.disabled = true;
+    const typing = this._bubble('assistant', '···');
+    if (typing) typing.classList.add('typing');
 
     try {
-      const resp = await fetch('/api/chat', {
+      const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, history: _chatHistory.slice(0, -1) }),
+        body: JSON.stringify({ message: msg, history: _chatHistory.slice(-10) }),
       });
-      const data = await resp.json();
-      const reply = data.reply || 'No pude procesar tu consulta.';
-
-      const t = document.getElementById('chat-typing');
-      if (t) t.remove();
-
-      this._appendBubble('assistant', reply);
+      const d = await res.json();
+      const reply = d.reply || d.message || 'No pude procesar tu consulta.';
+      if (typing) { typing.classList.remove('typing'); typing.textContent = reply; }
       _chatHistory.push({ role: 'assistant', content: reply });
     } catch (_) {
-      const t = document.getElementById('chat-typing');
-      if (t) t.remove();
-      this._appendBubble('assistant', 'Hubo un error de conexion. Intenta de nuevo.');
-    } finally {
-      if (input) { input.disabled = false; input.focus(); }
-      if (btn) btn.disabled = false;
+      if (typing) { typing.classList.remove('typing'); typing.textContent = 'Error de conexión. Intentá de nuevo.'; }
     }
+    const msgs = document.getElementById('cw-messages');
+    if (msgs) msgs.scrollTop = msgs.scrollHeight;
+  },
+
+  _makeDraggable() {
+    const wrap = document.getElementById('chat-widget');
+    const btn = document.getElementById('cw-btn');
+    let sx, sy, sl, sb, moved;
+
+    const move = (cx, cy) => {
+      const dx = cx - sx, dy = cy - sy;
+      if (!moved && Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+      moved = true;
+      this._dragging = true;
+      const r = Math.max(0, window.innerWidth - sl - dx - btn.offsetWidth);
+      const b = Math.max(0, sb - dy);
+      wrap.style.right = r + 'px';
+      wrap.style.bottom = b + 'px';
+    };
+
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMouse);
+      document.removeEventListener('mouseup', onUp);
+      setTimeout(() => { this._dragging = false; }, 0);
+    };
+    const onMouse = e => move(e.clientX, e.clientY);
+
+    btn.addEventListener('mousedown', e => {
+      moved = false;
+      sx = e.clientX; sy = e.clientY;
+      const r = wrap.getBoundingClientRect();
+      sl = r.left; sb = window.innerHeight - r.bottom;
+      document.addEventListener('mousemove', onMouse);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    btn.addEventListener('touchstart', e => {
+      moved = false;
+      const t = e.touches[0];
+      sx = t.clientX; sy = t.clientY;
+      const r = wrap.getBoundingClientRect();
+      sl = r.left; sb = window.innerHeight - r.bottom;
+    }, { passive: true });
+    btn.addEventListener('touchmove', e => {
+      const t = e.touches[0];
+      move(t.clientX, t.clientY);
+      if (moved) e.preventDefault();
+    }, { passive: false });
+    btn.addEventListener('touchend', () => {
+      setTimeout(() => { this._dragging = false; }, 0);
+    });
+  },
+};
+
+// Shim: if someone navigates to #chat directly, open the widget and stay on dashboard
+const Chat = {
+  render() {
+    ChatWidget.open();
+    history.replaceState(null, '', '#dashboard');
+    Dashboard.render();
   },
 };

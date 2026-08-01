@@ -237,6 +237,147 @@ const Insights = {
     }
   },
 
+  /* Returns a DOM fragment with key projections — used by Dashboard at the bottom */
+  buildSection(insights, budget) {
+    if (!insights) return null;
+    const frag = document.createDocumentFragment();
+    const month = new Date().toISOString().slice(0, 7);
+    const LABELS = { necesidades: 'Necesidades', gustos: 'Gustos', ahorro: 'Ahorro' };
+    const COLORS = { necesidades: '#3B82F6', gustos: '#A855F7', ahorro: 'var(--ok)' };
+
+    // Section header
+    const hdr = document.createElement('div');
+    hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin:32px 0 14px;';
+    const hTitle = document.createElement('p');
+    hTitle.className = 'section-title';
+    hTitle.style.margin = '0';
+    hTitle.textContent = 'Proyecciones del mes';
+    hdr.appendChild(hTitle);
+    frag.appendChild(hdr);
+
+    // Daily allowance pill
+    if (insights.daily_allowance != null) {
+      const pill = document.createElement('div');
+      pill.className = 'card';
+      pill.style.cssText = 'margin-bottom:14px;display:flex;align-items:center;gap:16px;padding:16px 20px;';
+      const icon = document.createElement('div');
+      icon.style.cssText = 'font-size:1.4rem;font-weight:800;color:var(--ok);min-width:32px;text-align:center;';
+      icon.textContent = '$';
+      const txt = document.createElement('div');
+      const v = document.createElement('div');
+      v.style.cssText = 'font-size:1.35rem;font-weight:700;color:var(--ok);';
+      v.textContent = App.fmt(insights.daily_allowance) + '/día';
+      const l = document.createElement('div');
+      l.style.cssText = 'font-size:.8rem;color:var(--muted);margin-top:2px;';
+      l.textContent = 'Disponible diario · ' + (insights.days_remaining || 0) + ' días restantes';
+      txt.appendChild(v);
+      txt.appendChild(l);
+      pill.appendChild(icon);
+      pill.appendChild(txt);
+      frag.appendChild(pill);
+    }
+
+    // End-of-month projection
+    const franjasArr = Array.isArray(insights.franjas) ? insights.franjas : [];
+    const projectedTotal = franjasArr.reduce((s, f) => s + (f.projected_total || 0), 0);
+    const incomeRef = (budget && budget.total_income) || insights.income || 0;
+    if (projectedTotal > 0) {
+      const willExceed = incomeRef > 0 && projectedTotal > incomeRef;
+      const fc = document.createElement('div');
+      fc.className = 'card';
+      fc.style.cssText = 'margin-bottom:14px;border-left:4px solid var(--' + (willExceed ? 'danger' : 'ok') + ');';
+      const t = document.createElement('p');
+      t.className = 'section-title';
+      t.style.marginBottom = '6px';
+      t.textContent = 'Proyección a fin de mes';
+      const big = document.createElement('div');
+      big.style.cssText = 'font-size:1.5rem;font-weight:700;color:var(--' + (willExceed ? 'danger' : 'white') + ');';
+      big.textContent = App.fmt(projectedTotal);
+      const sub = document.createElement('p');
+      sub.style.cssText = 'font-size:.82rem;color:var(--muted);margin-top:4px;';
+      sub.textContent = incomeRef > 0
+        ? (willExceed
+            ? 'A este ritmo te vas a pasar ' + App.fmt(projectedTotal - incomeRef) + ' de tus ingresos.'
+            : 'Vas a gastar el ' + Math.round(projectedTotal / incomeRef * 100) + '% de tus ingresos. Te sobrarían ' + App.fmt(incomeRef - projectedTotal) + '.')
+        : 'Gasto estimado al cierre del mes según tu ritmo actual.';
+      fc.appendChild(t);
+      fc.appendChild(big);
+      fc.appendChild(sub);
+      frag.appendChild(fc);
+    }
+
+    // Budget franjas with AI advice
+    franjasArr.forEach(function(f) {
+      const pct = f.limit > 0 ? Math.round(f.spent / f.limit * 100) : 0;
+      const cls = pct >= 90 ? 'danger' : pct >= 75 ? 'warn' : 'ok';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.style.marginBottom = '12px';
+
+      const hd = document.createElement('div');
+      hd.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;';
+      const nm = document.createElement('span');
+      nm.style.fontWeight = '600';
+      nm.textContent = LABELS[f.category] || f.category;
+      const pl = document.createElement('span');
+      pl.style.cssText = 'font-size:.83rem;font-weight:600;color:var(--' + cls + ');';
+      pl.textContent = pct + '%';
+      hd.appendChild(nm);
+      hd.appendChild(pl);
+      card.appendChild(hd);
+
+      const bg = document.createElement('div');
+      bg.style.cssText = 'background:rgba(255,255,255,.07);border-radius:99px;height:7px;margin-bottom:12px;overflow:hidden;';
+      const fill = document.createElement('div');
+      fill.style.cssText = 'height:100%;border-radius:99px;background:' + (COLORS[f.category] || '#888') + ';width:' + Math.min(pct, 100) + '%;';
+      bg.appendChild(fill);
+      card.appendChild(bg);
+
+      const stats = document.createElement('div');
+      stats.style.cssText = 'display:flex;gap:16px;flex-wrap:wrap;font-size:.79rem;color:var(--muted);margin-bottom:10px;';
+      [
+        'Gastado: ' + App.fmt(f.spent),
+        'Límite: ' + App.fmt(f.limit),
+        App.fmt(f.daily_allowance) + '/día disponible',
+      ].forEach((txt, i) => {
+        const s = document.createElement('span');
+        s.textContent = txt;
+        if (i === 2) s.style.color = 'var(--ok)';
+        stats.appendChild(s);
+      });
+      card.appendChild(stats);
+
+      const ab = document.createElement('button');
+      ab.className = 'btn btn-ghost btn-sm';
+      ab.textContent = 'Pedir consejo IA';
+      const ax = document.createElement('div');
+      ax.style.cssText = 'display:none;margin-top:10px;padding:10px;background:var(--navy3);border-radius:8px;font-size:.83rem;line-height:1.55;color:var(--white);';
+      ab.addEventListener('click', async function() {
+        ab.disabled = true; ab.textContent = 'Consultando…';
+        try {
+          const r = await fetch('/api/advisor/advice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ month, focus: f.category }),
+          });
+          const d = await r.json();
+          ax.textContent = d.advice;
+          ax.style.display = 'block';
+        } catch (_) {
+          ax.textContent = 'No se pudo obtener el consejo.';
+          ax.style.display = 'block';
+        } finally {
+          ab.disabled = false; ab.textContent = 'Pedir consejo IA';
+        }
+      });
+      card.appendChild(ab);
+      card.appendChild(ax);
+      frag.appendChild(card);
+    });
+
+    return frag;
+  },
+
   _monthLabel(ym) {
     const m = /^(\d{4})-(\d{2})$/.exec(ym || '');
     if (!m) return ym || '';
