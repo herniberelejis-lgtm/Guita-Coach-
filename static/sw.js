@@ -1,5 +1,5 @@
 /* Service worker: cache-first para estáticos, network-first para API. */
-const CACHE = 'guita-v8';
+const CACHE = 'guita-v10';
 const STATIC_ASSETS = [
   '/',
   '/static/css/style.css',

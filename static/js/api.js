@@ -20,8 +20,10 @@ const API = {
   delete: (path)        => API._req('DELETE', path),
 
   // Budget
-  getBudget:           () => API.get('/budget/current'),
+  getBudget:           (month) => API.get('/budget/current' + (month ? '?month=' + encodeURIComponent(month) : '')),
   getBudgetHistory:    () => API.get('/budget/history'),
+  getBudgetMonths:     () => API.get('/budget/months'),
+  updateBalance:       (balance) => API.patch('/budget/balance', { balance }),
   getInsights:         () => API.get('/insights/month'),
   postOnboarding:      (d) => API.post('/budget/onboarding', d),
   patchBudgetSettings: (d) => API.patch('/budget/settings', d),

@@ -31,6 +31,10 @@ class BudgetUpdatePayload(BaseModel):
     income_is_variable: Optional[bool] = None
 
 
+class BalancePayload(BaseModel):
+    balance: float
+
+
 def _franja_data(user: User, txs: list, month: str, days_remaining: int = 1,
                  reimb: dict | None = None, income_base: float | None = None) -> dict:
     income = income_base if income_base is not None else (user.monthly_income or 0)
@@ -66,22 +70,37 @@ def _franja_data(user: User, txs: list, month: str, days_remaining: int = 1,
 
 
 @router.get("/current")
-def get_current_budget(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def get_current_budget(month: Optional[str] = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     from ..services.recurring import apply_recurring
-    apply_recurring(db, user.id)
-    month = date.today().strftime("%Y-%m")
+
+    now = date.today()
+    current_month = now.strftime("%Y-%m")
+    if month:
+        try:
+            year, mo = (int(p) for p in month.split("-"))
+            target = date(year, mo, 1)
+        except (ValueError, TypeError):
+            raise HTTPException(400, "Mes inválido, usá el formato YYYY-MM")
+        month = target.strftime("%Y-%m")
+    else:
+        month = current_month
+        target = date(now.year, now.month, 1)
+
+    is_current = month == current_month
+    if is_current:
+        apply_recurring(db, user.id)
+
     txs = db.query(Transaction).filter(
         Transaction.user_id == user.id,
         Transaction.month == month,
         Transaction.status.in_(["confirmed", "classified"])
     ).all()
 
-    now = date.today()
-    days_in_month = (date(now.year, now.month % 12 + 1, 1) - date(now.year, now.month, 1)).days \
-        if now.month < 12 else (date(now.year + 1, 1, 1) - date(now.year, now.month, 1)).days
-    days_passed = now.day
+    days_in_month = (date(target.year, target.month % 12 + 1, 1) - date(target.year, target.month, 1)).days \
+        if target.month < 12 else (date(target.year + 1, 1, 1) - date(target.year, target.month, 1)).days
+    days_passed = now.day if is_current else days_in_month
 
-    days_remaining = max(days_in_month - days_passed, 1)
+    days_remaining = max(days_in_month - days_passed, 1) if is_current else 0
     reimb = reimbursement_map(db, user.id)
 
     visible_txs = [t for t in txs if not getattr(t, 'is_internal_transfer', False) and not getattr(t, 'is_duplicate', False)]
@@ -110,16 +129,17 @@ def get_current_budget(db: Session = Depends(get_db), user: User = Depends(get_c
     data["days_in_month"] = days_in_month
     data["days_remaining"] = days_in_month - days_passed
 
-    balance = total_income - total_expenses
     pending_count = sum(1 for t in txs if t.needs_review and t.status != "reviewed")
 
+    data["month"] = month
+    data["is_current_month"] = is_current
     data["total_income"] = total_income
     data["tracked_income"] = tracked_income
     data["declared_income"] = declared_income
     data["income_is_variable"] = is_variable
     data["income_is_declared"] = (not is_variable) and declared_income > tracked_income
     data["total_expenses"] = total_expenses
-    data["balance"] = balance
+    data["balance"] = user.balance or 0.0
     data["pending_count"] = pending_count
     data["onboarding_done"] = user.onboarding_done
     data["name"] = user.name
@@ -186,6 +206,26 @@ def update_budget_settings(payload: BudgetUpdatePayload, db: Session = Depends(g
 
     db.commit()
     return {"ok": True}
+
+
+@router.patch("/balance")
+def update_balance(payload: BalancePayload, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Ajuste manual del balance de caja (ej: efectivo, correcciones)."""
+    user.balance = payload.balance
+    db.commit()
+    return {"ok": True, "balance": user.balance}
+
+
+@router.get("/months")
+def get_available_months(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Meses con datos reales del usuario, más el mes actual (aunque esté vacío)."""
+    rows = db.query(Transaction.month).filter(
+        Transaction.user_id == user.id,
+        Transaction.status.in_(["confirmed", "classified"])
+    ).distinct().all()
+    months = {r[0] for r in rows if r[0]}
+    months.add(date.today().strftime("%Y-%m"))
+    return sorted(months, reverse=True)
 
 
 @router.post("/alerts/{alert_id}/read")

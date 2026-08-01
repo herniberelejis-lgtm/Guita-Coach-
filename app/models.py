@@ -16,6 +16,7 @@ class User(Base):
     ahorro_pct = Column(Float, default=20.0)
     payday = Column(Integer, default=1)
     income_is_variable = Column(Boolean, default=False)  # sin sueldo fijo: el presupuesto usa ingresos registrados
+    balance = Column(Float, default=0.0)  # balance de caja editable manualmente (ajustes de cash)
     onboarding_done = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 

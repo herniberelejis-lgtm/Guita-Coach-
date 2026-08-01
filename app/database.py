@@ -39,6 +39,7 @@ def _run_migrations():
         "ALTER TABLE investment_transaction ADD COLUMN asset_type VARCHAR DEFAULT 'stock'",
         "ALTER TABLE investment_transaction ADD COLUMN currency VARCHAR DEFAULT 'ARS'",
         "ALTER TABLE investment_price ADD COLUMN asset_type VARCHAR DEFAULT 'stock'",
+        "ALTER TABLE users ADD COLUMN balance FLOAT DEFAULT 0.0",
     ]
     with engine.connect() as conn:
         for sql in migrations:
