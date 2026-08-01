@@ -70,27 +70,11 @@ function _googleIcon() {
 function _buildDashboard(budget, months) {
   const frag = document.createDocumentFragment();
 
-  // Header: saludo + botón "conectar cuentas" (estilo Google Sign-In)
+  // Header: saludo + selector de mes + botón "conectar cuentas" (estilo Google Sign-In)
   const subtitle = budget.is_current_month
     ? _monthLabel(budget.month) + ' · día ' + budget.days_passed + ' de ' + budget.days_in_month
     : _monthLabel(budget.month) + ' · mes cerrado';
 
-  const header = _el('div', { className: 'page-header' },
-    _el('div', {},
-      _el('h2', {}, 'Hola, ' + (budget.name || 'Hernán')),
-      _el('p', { style: 'color:var(--muted);font-size:.88rem;margin-top:2px;' }, subtitle)
-    ),
-    _el('button', {
-      className: 'google-connect-btn',
-      onclick: () => App.navigate('settings')
-    }, _googleIcon(), 'Conectar cuentas')
-  );
-  frag.appendChild(header);
-
-  // Selector de mes
-  const monthRow = _el('div', { className: 'month-select-row' },
-    _el('label', { style: 'font-size:.78rem;color:var(--muted);' }, 'Mes:')
-  );
   const select = document.createElement('select');
   select.className = 'month-select';
   months.forEach(m => {
@@ -101,8 +85,21 @@ function _buildDashboard(budget, months) {
     select.appendChild(opt);
   });
   select.addEventListener('change', () => Dashboard._changeMonth(select.value));
-  monthRow.appendChild(select);
-  frag.appendChild(monthRow);
+
+  const header = _el('div', { className: 'page-header' },
+    _el('div', {},
+      _el('h2', {}, 'Hola, ' + (budget.name || 'Hernán')),
+      _el('p', { style: 'color:var(--muted);font-size:.88rem;margin-top:2px;' }, subtitle)
+    ),
+    _el('div', { style: 'display:flex;align-items:center;gap:12px;' },
+      select,
+      _el('button', {
+        className: 'google-connect-btn',
+        onclick: () => App.navigate('settings')
+      }, _googleIcon(), 'Conectar cuentas')
+    )
+  );
+  frag.appendChild(header);
 
   // Balance editable + distribución por franja + límite de gasto mensual
   frag.appendChild(_buildOverviewCard(budget));

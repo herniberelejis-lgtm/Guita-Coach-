@@ -5,6 +5,9 @@
 // si Prometeo ofrece un flujo hosted (tipo Plaid Link) para reemplazar el login directo.
 const PROMETEO_UI_ENABLED = false;
 
+// Por ahora dejamos solo Gmail + Mercado Pago habilitados en Configuración.
+const PLAID_UI_ENABLED = false;
+
 const Settings = {
   async render() {
     const main = document.getElementById('main');
@@ -59,9 +62,12 @@ const Settings = {
     });
 
     // ── Plaid (Bancos) ─────────────────────────────────────────────────────
-    const plaidStatus = syncStatus['plaid'];
-    const plaidConnected = plaidStatus?.status === 'connected';
-    main.appendChild(this._buildPlaidCard(plaidConnected, plaidStatus?.last_sync));
+    // Oculto temporalmente: ver nota PLAID_UI_ENABLED arriba.
+    if (PLAID_UI_ENABLED) {
+      const plaidStatus = syncStatus['plaid'];
+      const plaidConnected = plaidStatus?.status === 'connected';
+      main.appendChild(this._buildPlaidCard(plaidConnected, plaidStatus?.last_sync));
+    }
 
     // ── Prometeo (Open Banking - Argentina) ──────────────────────────────────
     // Oculto temporalmente: ver nota PROMETEO_UI_ENABLED arriba.

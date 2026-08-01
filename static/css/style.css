@@ -270,6 +270,7 @@ nav a svg { width: 18px; height: 18px; flex-shrink: 0; }
 /* ── Page header ─────────────────────────────────────────────────────────── */
 .page-header {
   display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px;
   margin-bottom: 24px;
 }
 .page-header h2 { color: var(--white); }
@@ -629,7 +630,6 @@ nav a svg { width: 18px; height: 18px; flex-shrink: 0; }
 .google-connect-btn:active { transform: scale(0.97); }
 
 /* ─── Selector de mes ────────────────────────────────────────────────────── */
-.month-select-row { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
 .month-select {
   background: var(--navy2);
   border: 1px solid rgba(255,255,255,.1);
