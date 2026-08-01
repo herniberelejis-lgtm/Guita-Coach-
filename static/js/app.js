@@ -14,6 +14,9 @@ const App = {
     academy:      () => Academy.render(),
   },
 
+  // Pages reachable by URL but not shown in nav
+  _hiddenPages: new Set(['insights', 'chat', 'investments']),
+
   async init() {
     // 1. Sesión: si no hay usuario, mostrar login/registro
     const user = await Auth.check();
@@ -36,6 +39,7 @@ const App = {
 
     this._bindNav();
     this._bindNotifications(budget.alerts || []);
+    ChatWidget.init();
     this._handleHash();
     window.addEventListener('hashchange', () => this._handleHash());
 
@@ -105,7 +109,7 @@ const App = {
     });
     const moreBtn = document.getElementById('more-nav-btn');
     if (moreBtn) {
-      const overflowPages = ['goals', 'chat', 'academy', 'settings'];
+      const overflowPages = ['settings'];
       moreBtn.classList.toggle('active', overflowPages.includes(page));
     }
   },
