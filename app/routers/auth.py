@@ -256,13 +256,14 @@ def _pop_state(state: str) -> int:
 
 
 def _save_tokens(db: Session, user_id: int, provider: str, tokens: dict) -> None:
+    from ..services.crypto import encrypt
     conn = db.query(Connection).filter_by(user_id=user_id, provider=provider).first()
     if not conn:
         conn = Connection(user_id=user_id, provider=provider)
         db.add(conn)
     conn.status = "connected"
-    conn.access_token = tokens.get("access_token")
-    conn.refresh_token = tokens.get("refresh_token")
+    conn.access_token = encrypt(tokens.get("access_token"))
+    conn.refresh_token = encrypt(tokens.get("refresh_token"))
     conn.last_sync = datetime.utcnow()
     db.commit()
 

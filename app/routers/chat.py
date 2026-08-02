@@ -29,6 +29,19 @@ def _month_list(n: int = 6) -> list[str]:
     return months
 
 
+def _clean_external_text(value: str, max_len: int = 80) -> str:
+    """Sanitiza texto que no controla el usuario (ej: descripción de una transferencia
+    que le mandó otra persona) antes de que entre al contexto del prompt del chat.
+    Corta saltos de línea/caracteres de control y cualquier intento de fingir el
+    delimitador <datos_usuario> para evitar que se salga del bloque de datos."""
+    if not value:
+        return value
+    cleaned = "".join(ch if ch.isprintable() and ch not in "\r\n\t" else " " for ch in value)
+    cleaned = cleaned.replace("<datos_usuario>", "").replace("</datos_usuario>", "")
+    cleaned = " ".join(cleaned.split())
+    return cleaned[:max_len]
+
+
 def _load_investment_context(db: Session, user: User) -> dict | None:
     """Resumen liviano de la cartera para el contexto del chat: usa precios ya
     cacheados en InvestmentPrice (sin red) para no agregar latencia al chat."""
@@ -101,7 +114,8 @@ def _load_financial_context(db: Session, user: User) -> dict:
         totals: dict = {}
         for t in items:
             if t.tx_type == "expense" and t.merchant:
-                totals[t.merchant] = totals.get(t.merchant, 0) + t.amount
+                merchant = _clean_external_text(t.merchant)
+                totals[merchant] = totals.get(merchant, 0) + t.amount
         return sorted(totals.items(), key=lambda x: x[1], reverse=True)[:n]
 
     # Desglose por subcategoría del mes

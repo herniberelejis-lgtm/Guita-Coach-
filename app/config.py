@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     prometeo_env: str = "sandbox"
     app_url: str = "http://localhost:8000"
     port: int = 8000
-    demo_mode: bool = True
+    demo_mode: bool = False  # nunca por defecto: debe activarse a propósito (fail-closed)
     live_prices: bool = True  # obtener precios de mercado en tiempo real (Yahoo/CoinGecko)
     database_url: str = ""  # postgres en prod (Railway inyecta DATABASE_URL); vacío = sqlite local
 
@@ -52,6 +52,10 @@ class Settings(BaseSettings):
         if self.ai_provider == "claude":
             return self.claude_enabled
         return self.gemini_enabled
+
+    @property
+    def secret_key_is_default(self) -> bool:
+        return self.secret_key == "dev-secret-key-change-in-production"
 
     model_config = {"env_file": ".env", "case_sensitive": False}
 

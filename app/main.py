@@ -1,11 +1,15 @@
 """FastAPI entry point — monta routers y sirve el frontend estático."""
+import logging
+import os
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse
-import os
 
 from .database import init_db
 from .routers import auth, budget, transactions, insights, sync, advisor, chat, goals, investments, investments_extra, academy
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Guita Coach", version="0.2.0", docs_url="/api/docs")
 
@@ -16,7 +20,21 @@ async def startup():
     from .config import get_settings
     from .database import SessionLocal
     from .models import Transaction
-    if get_settings().demo_mode:
+    settings = get_settings()
+
+    if settings.demo_mode:
+        logger.warning(
+            "DEMO_MODE está activo: cualquier request sin sesión se autentica como el usuario 1 "
+            "sin credenciales. Nunca dejar esto activo en un deploy con datos reales."
+        )
+    if settings.secret_key_is_default:
+        logger.warning(
+            "SECRET_KEY sigue en su valor por defecto — usado para cifrar tokens OAuth en reposo. "
+            "Generá uno propio (python -c \"import secrets; print(secrets.token_hex(32))\") y "
+            "seteá SECRET_KEY antes de manejar datos reales."
+        )
+
+    if settings.demo_mode:
         from .services.seed import seed_demo_data
         db = SessionLocal()
         try:
