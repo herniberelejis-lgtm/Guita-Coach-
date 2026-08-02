@@ -65,6 +65,47 @@ def test_installments_finish_and_deactivate(db):
     assert "Heladera (cuota 2/2)" in merchants
 
 
+def test_recurring_no_duplicate_under_concurrent_requests(tmp_path):
+    """Dos requests que llegan casi al mismo tiempo (dos sesiones separadas,
+    cada una lee el item ANTES de que la otra escriba) no deben duplicar la
+    transacción ni el contador de cuotas. Reproduce el TOCTOU: ambas pasan
+    el chequeo en Python antes de que exista un commit que la otra vea."""
+    db_path = tmp_path / "race.db"
+    engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+
+    setup = Session()
+    setup.add(User(id=1, monthly_income=100000))
+    setup.add(RecurringExpense(user_id=1, merchant="Alquiler", amount=200000,
+                               category="necesidades", day_of_month=5))
+    setup.commit()
+    setup.close()
+
+    today = datetime.date(2026, 6, 11)
+
+    # Dos sesiones independientes, cada una hace su propio SELECT antes de
+    # que ninguna haya aplicado el gasto — simula el request A y B llegando
+    # a la vez.
+    session_a = Session()
+    session_b = Session()
+    items_a = session_a.query(RecurringExpense).filter_by(user_id=1, active=True).all()
+    items_b = session_b.query(RecurringExpense).filter_by(user_id=1, active=True).all()
+    assert items_a[0].last_applied_month is None
+    assert items_b[0].last_applied_month is None  # ambas ven "todavía no aplicado"
+
+    created_a = apply_recurring(session_a, 1, today)
+    created_b = apply_recurring(session_b, 1, today)
+
+    total_created = created_a + created_b
+    assert total_created == 1, f"se esperaba que solo una request creara la transacción, crearon {total_created}"
+
+    verify = Session()
+    txs = verify.query(Transaction).filter_by(user_id=1, source="recurring").all()
+    assert len(txs) == 1, "no debe haber transacciones duplicadas del mismo gasto fijo/mes"
+    session_a.close(); session_b.close(); verify.close(); engine.dispose()
+
+
 def test_monthly_committed_sums_active_only(db):
     db.add(RecurringExpense(user_id=1, merchant="A", amount=1000, active=True))
     db.add(RecurringExpense(user_id=1, merchant="B", amount=500, active=False))

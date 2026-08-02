@@ -12,6 +12,7 @@ from ..services.investment_calculator import (
     calculate_pnl_unrealized,
     calculate_portfolio_summary,
 )
+from ..services.date_utils import days_in_month as _days_in_month
 
 router = APIRouter(prefix="/api/insights", tags=["insights"])
 
@@ -124,11 +125,7 @@ def month_insights(db: Session = Depends(get_db), user: User = Depends(get_curre
     reimb = reimbursement_map(db, user.id)
     is_variable = bool(getattr(user, "income_is_variable", False))
 
-    days_in_month = (
-        (date(now.year, now.month % 12 + 1, 1) - date(now.year, now.month, 1)).days
-        if now.month < 12
-        else (date(now.year + 1, 1, 1) - date(now.year, now.month, 1)).days
-    )
+    days_in_month = _days_in_month(now.year, now.month)
     days_passed = now.day
     days_remaining = days_in_month - days_passed
 
@@ -306,11 +303,7 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_us
     total_spent = sum(t.amount for t in expense_txs)
 
     # Calculate days remaining in month
-    days_in_month = (
-        (date(now.year, now.month % 12 + 1, 1) - date(now.year, now.month, 1)).days
-        if now.month < 12
-        else (date(now.year + 1, 1, 1) - date(now.year, now.month, 1)).days
-    )
+    days_in_month = _days_in_month(now.year, now.month)
     days_passed = now.day
     days_remaining = days_in_month - days_passed
 

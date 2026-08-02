@@ -2,6 +2,7 @@
 from datetime import datetime, date
 from sqlalchemy.orm import Session
 from ..models import Transaction, Alert, User
+from .date_utils import days_in_month as _days_in_month
 
 def _capitalize(s: str) -> str:
     return s.capitalize()
@@ -9,8 +10,7 @@ def _capitalize(s: str) -> str:
 async def run_alert_engine(user_id: int, db: Session):
     now = date.today()
     month = now.strftime("%Y-%m")
-    days_in_month = (date(now.year, now.month % 12 + 1, 1) - date(now.year, now.month, 1)).days if now.month < 12 \
-        else (date(now.year + 1, 1, 1) - date(now.year, now.month, 1)).days
+    days_in_month = _days_in_month(now.year, now.month)
     days_passed = now.day
     days_remaining = days_in_month - days_passed
 
