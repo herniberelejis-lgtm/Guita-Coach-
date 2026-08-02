@@ -2,7 +2,7 @@
 from datetime import date
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Transaction, CategoryRule, User
@@ -13,8 +13,8 @@ router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 
 
 class ManualTransaction(BaseModel):
-    merchant: str
-    amount: float
+    merchant: str = Field(min_length=1, max_length=200)
+    amount: float = Field(gt=0)
     date: str
     tx_type: str = "expense"
     category: str = ""
@@ -149,7 +149,7 @@ async def add_manual_transaction(payload: ManualTransaction, db: Session = Depen
     db.refresh(tx)
     from ..services.dedup import mark_duplicates_and_transfers
     mark_duplicates_and_transfers(db, user.id, tx.month)
-    run_alert_engine(user.id, db)
+    await run_alert_engine(user.id, db)
     return _tx_dict(tx)
 
 
