@@ -123,7 +123,77 @@ function _buildDashboard(budget, months) {
     if (wrap) { wrap.textContent = ''; wrap.appendChild(_buildMonthlyStackedChart(hist)); }
   }).catch(() => {});
 
+  // Widget de metas activas
+  const goalsPlaceholder = _el('div', { id: 'dash-goals-widget' });
+  frag.appendChild(goalsPlaceholder);
+  Promise.all([API.getGoals().catch(() => []), API.getDolar().catch(() => null)]).then(([goals, dolar]) => {
+    const wrap = document.getElementById('dash-goals-widget');
+    if (!wrap) return;
+    const active = goals.filter(g => !g.is_done).slice(0, 3);
+    if (!active.length) return;
+    wrap.appendChild(_buildGoalsWidget(active, dolar, budget));
+  }).catch(() => {});
+
   return frag;
+}
+
+function _buildGoalsWidget(goals, dolar, budget) {
+  const card = _el('div', { className: 'card', style: 'margin-top:0;' },
+    _el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;' },
+      _el('p', { className: 'section-title', style: 'margin:0;' }, 'Mis objetivos'),
+      _el('a', { href: '#goals', style: 'font-size:.8rem;color:var(--gold);text-decoration:none;' }, 'Ver todas →')
+    )
+  );
+
+  goals.forEach(g => {
+    const usdNote = g.currency === 'ARS' && dolar?.blue?.venta
+      ? ' (~US$' + Math.round(g.saved_amount / dolar.blue.venta).toLocaleString('es-AR') + ')'
+      : '';
+
+    // Quick contribute input area (hidden by default, shown on click)
+    const contInput = document.createElement('input');
+    contInput.type = 'number';
+    contInput.placeholder = 'Monto';
+    contInput.min = '1';
+    contInput.className = 'dash-goal-input';
+    contInput.style.display = 'none';
+
+    const contOk = _el('button', { className: 'btn btn-primary btn-sm', style: 'display:none;padding:4px 10px;' }, '✓');
+    contOk.onclick = async function() {
+      const val = parseFloat(contInput.value);
+      if (!val || val <= 0) { App.toast('Ingresá un monto', 'error'); return; }
+      this.disabled = true;
+      try {
+        await API.contributeGoal(g.id, val);
+        App.toast('Aporte registrado ✓', 'success');
+        Dashboard.render();
+      } catch (e) { App.toast(e.message, 'error'); this.disabled = false; }
+    };
+
+    const aportarBtn = _el('button', { className: 'btn btn-ghost btn-sm', style: 'padding:4px 10px;font-size:.78rem;' }, 'Aportar');
+    aportarBtn.onclick = () => {
+      const open = contInput.style.display !== 'none';
+      contInput.style.display = open ? 'none' : 'inline-block';
+      contOk.style.display    = open ? 'none' : 'inline-flex';
+      aportarBtn.textContent  = open ? 'Aportar' : '✕';
+      if (!open) { contInput.focus(); }
+    };
+
+    const row = _el('div', { className: 'dash-goal-row' },
+      _el('div', { className: 'dash-goal-info' },
+        _el('div', { className: 'dash-goal-name' }, g.name),
+        _el('div', { className: 'dash-goal-amounts' },
+          App.fmt(g.saved_amount) + usdNote + ' / ' + App.fmt(g.target_amount))
+      ),
+      _el('div', { className: 'dash-goal-track' },
+        _el('div', { className: 'dash-goal-fill', style: 'width:' + g.progress_pct + '%' })
+      ),
+      _el('div', { className: 'dash-goal-actions' }, aportarBtn, contInput, contOk)
+    );
+    card.appendChild(row);
+  });
+
+  return card;
 }
 
 function _buildOverviewCard(budget) {

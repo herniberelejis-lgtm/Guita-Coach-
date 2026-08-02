@@ -825,35 +825,149 @@ nav a svg { width: 18px; height: 18px; flex-shrink: 0; }
   #more-sheet, #more-backdrop { display: none !important; }
 }
 
-/* ─── Metas ─────────────────────────────────────────────────────────────── */
-.goal-card {
-  padding: 14px 0; border-bottom: 1px solid var(--navy3);
+/* ─── Metas SMART ───────────────────────────────────────────────────────── */
+
+/* Página de metas — empty state */
+.smart-empty {
+  text-align: center; padding: 48px 24px; color: var(--muted);
+  margin-bottom: 20px;
 }
-.goal-card:last-child { border-bottom: 0; }
-.goal-card.done { opacity: .75; }
-.goal-head {
-  display: flex; justify-content: space-between; align-items: baseline;
-  gap: 10px; margin-bottom: 8px; flex-wrap: wrap;
+
+/* Formulario de nueva meta */
+.smart-form-card { margin-bottom: 20px; }
+.smart-form-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 20px;
 }
-.goal-head strong { color: var(--white); font-size: .95rem; }
-.goal-amounts { color: var(--muted); font-size: .8rem; }
-.goal-actions {
-  display: flex; justify-content: space-between; align-items: center; margin-top: 8px;
+@media (max-width: 700px) { .smart-form-grid { grid-template-columns: 1fr; } }
+
+.smart-input {
+  width: 100%; background: transparent;
+  border: 0; border-bottom: 1.5px solid var(--color-border);
+  color: var(--color-text); font-family: var(--font-body);
+  font-size: .92rem; padding: 8px 0;
+  transition: border-color var(--transition);
 }
-.progress-fill.gold { background: var(--gold); }
-.btn-link {
-  background: none; border: 0; color: var(--gold); cursor: pointer;
-  font-family: inherit; font-size: .78rem; font-weight: 600; padding: 2px 8px;
+.smart-input:focus { outline: none; border-bottom-color: var(--color-accent); }
+.smart-input::placeholder { color: var(--muted); opacity: .7; }
+.smart-input.small { width: 140px; }
+
+.smart-select {
+  background: var(--navy3); border: 1px solid rgba(255,255,255,.1);
+  border-radius: 6px; color: var(--white); font-family: var(--font-body);
+  font-size: .88rem; padding: 7px 10px; cursor: pointer;
+  transition: border-color var(--transition);
 }
-.btn-link.danger { color: var(--danger); }
-.btn-link:hover { text-decoration: underline; }
-.subgoal {
-  display: flex; align-items: center; gap: 10px;
-  margin: 6px 0 0 14px; padding: 6px 10px;
-  background: var(--bg); border-radius: 8px;
-  color: var(--white); font-size: .82rem;
+.smart-select:focus { outline: none; border-color: var(--color-accent); }
+
+/* Cálculo en tiempo real */
+.smart-calc-box {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  min-height: 28px; margin-top: 12px; padding: 8px 12px;
+  background: var(--navy3); border-radius: 8px; font-size: .82rem;
 }
-.subgoal span:first-child { flex: 1; }
+.calc-monthly { color: var(--muted); }
+.calc-badge { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: .74rem; font-weight: 600; }
+.calc-badge.achievable { background: rgba(127,184,156,.15); color: var(--ok); }
+.calc-badge.stretch    { background: rgba(229,138,147,.15); color: var(--danger); }
+
+/* Tarjeta de meta individual */
+.smart-goal-card {
+  background: var(--navy2); border: 1px solid rgba(255,255,255,.05);
+  border-radius: var(--radius); padding: 18px 20px;
+  margin-bottom: 12px; transition: border-color var(--transition);
+}
+.smart-goal-card:hover { border-color: rgba(255,255,255,.1); }
+.smart-goal-card.done  { opacity: .7; }
+
+.smart-title-row {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px;
+}
+.smart-title-row strong { font-size: .97rem; color: var(--white); }
+
+.btn-icon-ghost {
+  background: none; border: 0; color: var(--muted); cursor: pointer;
+  display: inline-flex; align-items: center; padding: 2px; border-radius: 4px;
+  transition: color var(--transition);
+}
+.btn-icon-ghost:hover { color: var(--danger); }
+
+.smart-track {
+  height: 6px; background: var(--navy3); border-radius: 99px;
+  overflow: hidden; margin-bottom: 10px;
+}
+.smart-fill {
+  height: 100%; border-radius: 99px;
+  background: var(--gold);
+  transition: width 600ms var(--ease-out);
+}
+
+.smart-info-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: .82rem; color: var(--muted); margin-bottom: 10px; flex-wrap: wrap; gap: 6px;
+}
+
+.goal-deadline-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 6px;
+  background: rgba(255,255,255,.06); font-size: .74rem; color: var(--muted);
+}
+
+/* Análisis SMART */
+.smart-analysis {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 12px; background: var(--navy3); border-radius: 8px;
+  margin-bottom: 12px; font-size: .82rem;
+}
+.smart-monthly-label { color: var(--muted); }
+.smart-achievable-badge {
+  display: inline-block; padding: 2px 10px; border-radius: 99px;
+  font-size: .74rem; font-weight: 600;
+}
+.smart-achievable-badge.ok   { background: rgba(127,184,156,.15); color: var(--ok); }
+.smart-achievable-badge.warn { background: rgba(229,138,147,.15); color: var(--danger); }
+
+/* Submetas */
+.smart-subgoals {
+  margin-bottom: 12px; border-top: 1px solid rgba(255,255,255,.05); padding-top: 10px;
+}
+.smart-sub-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: .82rem; padding: 4px 0; color: var(--muted);
+}
+
+/* Fila de aporte inline */
+.smart-contribute-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  border-top: 1px solid rgba(255,255,255,.05); padding-top: 12px; margin-top: 4px;
+}
+
+/* Widget de metas en el dashboard */
+.dash-goal-row {
+  display: grid; grid-template-columns: 1fr 1fr auto;
+  gap: 10px 16px; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.dash-goal-row:last-child { border-bottom: 0; }
+.dash-goal-name { font-size: .9rem; color: var(--white); font-weight: 500; margin-bottom: 2px; }
+.dash-goal-amounts { font-size: .76rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.dash-goal-track {
+  height: 5px; background: var(--navy3); border-radius: 99px; overflow: hidden;
+}
+.dash-goal-fill {
+  height: 100%; border-radius: 99px; background: var(--gold);
+  transition: width 500ms var(--ease-out);
+}
+.dash-goal-actions { display: flex; align-items: center; gap: 6px; }
+.dash-goal-input {
+  width: 90px; background: var(--navy3); border: 1px solid rgba(255,255,255,.1);
+  border-radius: 6px; color: var(--white); font-family: var(--font-body);
+  font-size: .82rem; padding: 4px 8px;
+}
+.dash-goal-input:focus { outline: none; border-color: var(--color-accent); }
+@media (max-width: 600px) {
+  .dash-goal-row { grid-template-columns: 1fr auto; }
+  .dash-goal-track { display: none; }
+}
 
 /* ─── Gastos fijos ──────────────────────────────────────────────────────── */
 .recurring-row {
