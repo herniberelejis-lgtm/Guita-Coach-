@@ -231,40 +231,9 @@ const Onboarding = {
   },
 };
 
-// ─── Temas de color ─────────────────────────────────────────────────────────
-const Theme = {
-  THEMES: [
-    { id: 'neo',     label: 'Neo-Fintech',  dot: '#7C3AED' },
-    { id: 'classic', label: 'Clásico',      dot: '#1E3A8A' },
-    { id: 'zen',     label: 'Zen',          dot: '#84A98C' },
-  ],
-
-  apply(id) {
-    document.documentElement.dataset.theme = id;
-    localStorage.setItem('gc-theme', id);
-    const meta = document.querySelector('meta[name=theme-color]');
-    if (meta) {
-      meta.content = { neo: '#0B0B14', classic: '#F1F5F9', zen: '#F5F1E8' }[id] || '#020617';
-    }
-  },
-
-  init() {
-    this.apply(localStorage.getItem('gc-theme') || 'zen');
-    const footer = document.querySelector('.sidebar-footer');
-    if (!footer) return;
-    const row = document.createElement('div');
-    row.className = 'theme-row';
-    this.THEMES.forEach(t => {
-      const dot = document.createElement('button');
-      dot.className = 'theme-dot';
-      dot.style.background = t.dot;
-      dot.title = 'Tema ' + t.label;
-      dot.onclick = () => Theme.apply(t.id);
-      row.appendChild(dot);
-    });
-    footer.prepend(row);
-  },
-};
+// Identidad de marca única (negro absoluto + magenta eléctrico) — sin selector
+// de temas: el manual de marca exige monocromía estricta, no varias paletas.
+const Theme = { init() {} };
 
 // Boot on load
 window.addEventListener('DOMContentLoaded', () => { Theme.init(); App.init(); });

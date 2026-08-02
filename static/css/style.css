@@ -1,20 +1,35 @@
 /* ── Reset & Variables ──────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ── Identidad de marca (Manual de Marca Guita Coach v3.0) ──────────────────
+   Monocromía estricta: negro absoluto + blanco puro + grises = 80-90% de la
+   superficie. Magenta eléctrico es el ÚNICO acento de marca (CTAs, estado
+   activo, links). Azul niebla / verde suave / amarillo suave / rosa coral
+   son colores FUNCIONALES (franjas y semántica financiera), nunca decoración
+   — entre todos no deben superar el 10-20% de la superficie de una pantalla. */
 :root {
-  --bg:      #020617;
-  --navy:    #020617;    /* kept for JS compat */
-  --navy2:   #0F172A;
-  --navy3:   #1E293B;
-  --gold:    #22C55E;    /* repurposed: was gold accent, now green CTA/positive */
-  --gold2:   #16A34A;    /* darker green hover */
-  --white:   #F8FAFC;
-  --muted:   #94A3B8;
-  --danger:  #EF4444;
-  --warn:    #F59E0B;
-  --ok:      #22C55E;
-  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
-  --font-head: 'IBM Plex Sans', system-ui, sans-serif;
+  --bg:      #0A0A0C;   /* negro absoluto */
+  --navy:    #0A0A0C;   /* kept for JS compat */
+  --navy2:   #141416;   /* gris profundo — cards y contenedores */
+  --navy3:   #1F1F23;   /* gris superficie — fondos secundarios */
+  --border:  #2A2A2F;   /* gris borde — divisiones sutiles */
+  --gold:    #E91E8C;   /* magenta eléctrico — acento único de marca */
+  --gold2:   #C4177A;   /* magenta hover, más oscuro */
+  --white:   #FFFFFF;   /* blanco puro */
+  --muted:   #9A9AA2;
+
+  /* Colores funcionales — franjas presupuestarias */
+  --necesidades: #6E8CAE;  /* azul niebla: calma, control, prioridad */
+  --gustos:      #E3C27E;  /* amarillo suave: atención preventiva sin urgencia */
+  --ahorro:      #7FB89C;  /* verde suave: crecimiento y señales positivas */
+
+  /* Semántica financiera (positivo/negativo), heredada de los colores funcionales */
+  --danger:  #E58A93;   /* rosa coral: alertas y excesos */
+  --warn:    #E3C27E;   /* amarillo suave */
+  --ok:      #7FB89C;   /* verde suave */
+
+  --font-body: 'Montserrat', system-ui, sans-serif;
+  --font-head: 'Montserrat', system-ui, sans-serif;
   --radius: 12px;
   --shadow: 0 4px 24px rgba(0,0,0,0.5);
   /* Custom easing curves — never use bare `ease` for UI */
@@ -22,6 +37,16 @@
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --transition: .18s cubic-bezier(0.23, 1, 0.32, 1);
+
+  /* Alias --color-* usados por overlays de auth/onboarding y componentes nuevos */
+  --color-bg: var(--bg);
+  --color-bg-secondary: var(--navy2);
+  --color-accent: var(--gold);
+  --color-text: var(--white);
+  --color-text-secondary: var(--muted);
+  --color-gain: var(--ok);
+  --color-loss: var(--danger);
+  --color-border: var(--border);
 }
 
 html, body {
@@ -34,11 +59,13 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── Typography ─────────────────────────────────────────────────────────── */
-h1, h2, h3 { font-family: var(--font-head); font-weight: 600; line-height: 1.2; }
-h1 { font-size: 2rem; }
-h2 { font-size: 1.5rem; }
-h3 { font-size: 1.15rem; }
+/* ── Typography (escala del manual de marca: H1 48/Bold, H2 32/SemiBold,
+   H3 24/Medium, Body 16/Regular, Caption 12/Regular, Metric 20/Bold) ──────── */
+h1 { font-family: var(--font-head); font-weight: 700; font-size: 3rem;    line-height: 1.15; }
+h2 { font-family: var(--font-head); font-weight: 600; font-size: 2rem;    line-height: 1.2; }
+h3 { font-family: var(--font-head); font-weight: 500; font-size: 1.5rem; line-height: 1.25; }
+.caption { font-size: .75rem; font-weight: 400; color: var(--muted); }
+.metric  { font-size: 1.25rem; font-weight: 700; }
 a { color: var(--gold); text-decoration: none; }
 
 /* ── Layout ─────────────────────────────────────────────────────────────── */
@@ -185,9 +212,9 @@ nav a svg { width: 18px; height: 18px; flex-shrink: 0; }
   font-weight: 600;
   text-transform: capitalize;
 }
-.badge.necesidades { background: rgba(59,130,246,0.15);  color: #60A5FA; }
-.badge.gustos      { background: rgba(168,85,247,0.15);  color: #C084FC; }
-.badge.ahorro      { background: rgba(34,197,94,0.15);   color: var(--ok); }
+.badge.necesidades { background: rgba(110,140,174,0.18); color: var(--necesidades); }
+.badge.gustos      { background: rgba(227,194,126,0.18); color: var(--gustos); }
+.badge.ahorro      { background: rgba(127,184,156,0.18); color: var(--ahorro); }
 .badge.review      { background: rgba(239,68,68,0.15);   color: var(--danger); }
 .badge.ingreso     { background: rgba(34,197,94,0.12);   color: var(--ok); }
 
@@ -677,24 +704,33 @@ nav a svg { width: 18px; height: 18px; flex-shrink: 0; }
 .franja-bar-row { display: flex; align-items: center; gap: 10px; }
 .franja-bar-label { width: 84px; flex-shrink: 0; font-size: .78rem; color: var(--muted); }
 .franja-bar-track { flex: 1; height: 10px; border-radius: 99px; background: var(--bg); overflow: hidden; }
-.franja-bar-fill { height: 100%; border-radius: 99px; transition: width .5s ease; }
+.franja-bar-fill { height: 100%; border-radius: 99px; transition: width .5s ease, box-shadow .5s ease; box-shadow: 0 0 8px currentColor; }
 .franja-bar-amount { width: 92px; flex-shrink: 0; text-align: right; font-size: .8rem; font-weight: 600; color: var(--white); }
 
 .limit-bar-wrap { display: flex; flex-direction: column; gap: 8px; }
 .limit-bar-labels { display: flex; justify-content: space-between; font-size: .8rem; color: var(--muted); }
 .limit-bar-track { height: 14px; border-radius: 99px; background: var(--bg); overflow: hidden; }
-.limit-bar-fill { height: 100%; border-radius: 99px; transition: width .6s var(--ease-out); }
+.limit-bar-fill { height: 100%; border-radius: 99px; transition: width .6s var(--ease-out); box-shadow: 0 0 10px rgba(233,30,140,.35); }
 
 /* ─── Gráfico de barras verticales apiladas (gasto mes a mes) ───────────── */
 .vbar-chart { display: flex; align-items: flex-end; gap: 16px; padding: 8px 4px 0; }
 .vbar-col { display: flex; flex-direction: column; align-items: center; flex: 1; }
-.vbar-total { font-size: .72rem; color: var(--muted); margin-bottom: 6px; white-space: nowrap; }
+.vbar-total {
+  font-size: .72rem; font-weight: 600; color: var(--muted); margin-bottom: 6px;
+  white-space: nowrap; transition: color var(--transition);
+}
 .vbar-bar-area { height: 130px; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
 .vbar-stack {
-  width: 100%; max-width: 34px; display: flex; flex-direction: column-reverse;
-  border-radius: 6px 6px 2px 2px; overflow: hidden; background: var(--bg);
+  width: 100%; max-width: 40px; display: flex; flex-direction: column-reverse;
+  border-radius: 8px 8px 3px 3px; overflow: hidden; background: var(--navy3);
+  transition: filter var(--transition), box-shadow var(--transition);
 }
-.vbar-seg { width: 100%; transition: height .5s ease; }
+.vbar-seg { width: 100%; transition: height .5s var(--ease-out); }
+.vbar-col:hover .vbar-stack {
+  filter: brightness(1.12);
+  box-shadow: 0 0 16px rgba(233,30,140,.25);
+}
+.vbar-col:hover .vbar-total { color: var(--white); }
 .vbar-label { font-size: .74rem; color: var(--muted); margin-top: 10px; text-transform: capitalize; }
 .vbar-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 16px; justify-content: center; }
 
@@ -721,62 +757,6 @@ nav a svg { width: 18px; height: 18px; flex-shrink: 0; }
 }
 .social-btn:hover:not(:disabled) { border-color: var(--color-accent); background: transparent; }
 .social-btn:disabled { opacity: .45; cursor: not-allowed; }
-
-/* ─── Temas de color (60/30/10) ─────────────────────────────────────────── */
-/* Neo-Fintech: grafito + violeta + verde neón (default refinado) */
-html[data-theme="neo"] {
-  --bg:    #0B0B14;
-  --navy2: #15152A;
-  --navy3: #232342;
-  --gold:  #A3E635;      /* acento lima para CTAs y positivos */
-  --gold2: #84CC16;
-  --white: #F4F4FB;
-  --muted: #9D9DBE;
-  --accent-primary: #7C3AED;
-}
-
-/* Clásico Confiable: azul marino + esmeralda + gris claro */
-html[data-theme="classic"] {
-  --bg:    #F1F5F9;
-  --navy2: #FFFFFF;
-  --navy3: #E2E8F0;
-  --gold:  #059669;      /* esmeralda para CTAs y saldos positivos */
-  --gold2: #047857;
-  --white: #1E3A8A;      /* texto principal azul marino */
-  --muted: #64748B;
-  --accent-primary: #1E3A8A;
-  --shadow: 0 4px 18px rgba(30,58,138,.10);
-}
-
-/* Finanzas Zen: arena + salvia + terracota */
-html[data-theme="zen"] {
-  --bg:    #F5F1E8;
-  --navy2: #FDFBF6;
-  --navy3: #E5DFD0;
-  --gold:  #C97B4A;      /* terracota para acentos y logros */
-  --gold2: #B5683B;
-  --white: #3D4A3F;      /* texto verde bosque apagado */
-  --muted: #8A9182;
-  --accent-primary: #84A98C;
-  --shadow: 0 4px 18px rgba(61,74,63,.10);
-
-  /* CSS variables para compatibilidad con HTML */
-  --color-bg: #F5F1E8;
-  --color-bg-secondary: #FDFBF6;
-  --color-accent: #C97B4A;
-  --color-text: #3D4A3F;
-  --color-text-secondary: #8A9182;
-  --color-gain: #22C55E;
-  --color-loss: #EF4444;
-  --color-border: #E5DFD0;
-}
-
-.theme-row { display: flex; gap: 8px; margin-bottom: 10px; }
-.theme-dot {
-  width: 18px; height: 18px; border-radius: 50%;
-  border: 2px solid var(--navy3); cursor: pointer; transition: var(--transition);
-}
-.theme-dot:hover { transform: scale(1.2); border-color: var(--muted); }
 
 /* ─── Bottom nav (formato app en mobile) ────────────────────────────────── */
 #bottom-nav {

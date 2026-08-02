@@ -102,7 +102,7 @@ const Insights = {
 
     // Franjas
     const LABELS = { necesidades: 'Necesidades', gustos: 'Gustos', ahorro: 'Ahorro' };
-    const COLORS = { necesidades: '#3B82F6', gustos: '#A855F7', ahorro: 'var(--ok)' };
+    const COLORS = { necesidades: 'var(--necesidades)', gustos: 'var(--gustos)', ahorro: 'var(--ahorro)' };
 
     const franjasTitle = document.createElement('p');
     franjasTitle.className = 'section-title';
@@ -243,7 +243,7 @@ const Insights = {
     const frag = document.createDocumentFragment();
     const month = new Date().toISOString().slice(0, 7);
     const LABELS = { necesidades: 'Necesidades', gustos: 'Gustos', ahorro: 'Ahorro' };
-    const COLORS = { necesidades: '#3B82F6', gustos: '#A855F7', ahorro: 'var(--ok)' };
+    const COLORS = { necesidades: 'var(--necesidades)', gustos: 'var(--gustos)', ahorro: 'var(--ahorro)' };
 
     // Section header
     const hdr = document.createElement('div');

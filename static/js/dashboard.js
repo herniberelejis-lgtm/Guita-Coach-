@@ -200,7 +200,7 @@ function _buildFranjaBars(franjas) {
     wrap.appendChild(_el('div', { className: 'franja-bar-row' },
       _el('span', { className: 'franja-bar-label' }, f.label),
       _el('div', { className: 'franja-bar-track' },
-        _el('div', { className: 'franja-bar-fill', style: 'width:' + pct + '%;background:' + (FRANJA_COLORS[f.name] || '#888') })
+        _el('div', { className: 'franja-bar-fill', style: 'width:' + pct + '%;background:' + (FRANJA_COLORS[f.name] || '#888') + ';color:' + (FRANJA_COLORS[f.name] || '#888') })
       ),
       _el('span', { className: 'franja-bar-amount' }, App.fmt(f.spent))
     ));
@@ -224,7 +224,8 @@ function _buildLimitBar(budget) {
   );
 }
 
-const FRANJA_COLORS = { necesidades: '#5B8DEF', gustos: '#C8A84B', ahorro: '#4CAF8C' };
+// Colores funcionales del manual de marca: azul niebla / amarillo suave / verde suave.
+const FRANJA_COLORS = { necesidades: '#6E8CAE', gustos: '#E3C27E', ahorro: '#7FB89C' };
 
 /* Donut SVG: gasto por franja sobre el total gastado. */
 function _buildDonut(franjas) {
