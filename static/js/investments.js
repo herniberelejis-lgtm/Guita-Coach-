@@ -188,7 +188,7 @@ const Investments = {
       div.className = 'alert-item ' + it.cls;
       const icon = document.createElement('span');
       icon.className = 'alert-icon';
-      icon.textContent = it.cls === 'warning' ? '⚠️' : 'ℹ️';
+      icon.innerHTML = Icon(it.cls === 'warning' ? 'warning' : 'info', 16);
       const msg = document.createElement('span');
       msg.className = 'alert-msg';
       msg.textContent = it.text;
@@ -735,8 +735,8 @@ const Investments = {
     const zone = document.createElement('div');
     zone.className = 'upload-zone';
     const icon = document.createElement('div');
-    icon.style.cssText = 'font-size:24px;margin-bottom:8px;';
-    icon.textContent = '📁';
+    icon.style.cssText = 'margin-bottom:8px;color:var(--color-text-secondary);display:flex;justify-content:center;';
+    icon.innerHTML = Icon('folder', 24);
     zone.appendChild(icon);
     const p1 = document.createElement('p');
     p1.textContent = 'Arrastrá un CSV/XLSX o hacé clic';

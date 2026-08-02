@@ -8,11 +8,11 @@
    son colores FUNCIONALES (franjas y semántica financiera), nunca decoración
    — entre todos no deben superar el 10-20% de la superficie de una pantalla. */
 :root {
-  --bg:      #0A0A0C;   /* negro absoluto */
-  --navy:    #0A0A0C;   /* kept for JS compat */
-  --navy2:   #141416;   /* gris profundo — cards y contenedores */
-  --navy3:   #1F1F23;   /* gris superficie — fondos secundarios */
-  --border:  #2A2A2F;   /* gris borde — divisiones sutiles */
+  --bg:      #121110;   /* negro absoluto (grafito cálido) */
+  --navy:    #121110;   /* kept for JS compat */
+  --navy2:   #1C1A19;   /* gris profundo cálido — cards y contenedores */
+  --navy3:   #262320;   /* gris superficie cálido — fondos secundarios */
+  --border:  #37332F;   /* gris borde cálido — divisiones sutiles */
   --gold:    #E91E8C;   /* magenta eléctrico — acento único de marca */
   --gold2:   #C4177A;   /* magenta hover, más oscuro */
   --white:   #FFFFFF;   /* blanco puro */
