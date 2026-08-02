@@ -315,20 +315,21 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_us
         )
     ).all()
 
-    # Build holdings list for calculator
-    holdings = []
-    for inv in open_investments:
-        # Get current price
-        price_record = db.query(InvestmentPrice).filter(
-            InvestmentPrice.ticker == inv.ticker
-        ).first()
-        current_price = price_record.price if price_record else 0.0
-
-        holdings.append({
+    # Build holdings list for calculator. Precios en un solo query (antes: uno
+    # por inversión) — evita N round-trips a la base en cada carga del dashboard.
+    tickers = {inv.ticker for inv in open_investments}
+    price_by_ticker = {
+        p.ticker: p.price
+        for p in db.query(InvestmentPrice).filter(InvestmentPrice.ticker.in_(tickers)).all()
+    } if tickers else {}
+    holdings = [
+        {
             "quantity": inv.quantity,
             "avg_cost": inv.avg_cost,
-            "current_price": current_price,
-        })
+            "current_price": price_by_ticker.get(inv.ticker, 0.0),
+        }
+        for inv in open_investments
+    ]
 
     # Calculate realized P&L from closed positions
     closed_investments = db.query(Investment).filter(
@@ -338,27 +339,25 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_us
         )
     ).all()
 
-    realized_pnl = 0.0
-    for inv in closed_investments:
-        # Get buy and sell transactions for this investment
-        buy_txs = db.query(InvestmentTransaction).filter(
-            and_(
-                InvestmentTransaction.investment_id == inv.id,
-                InvestmentTransaction.tx_type == "buy",
-            )
+    # Todas las compras/ventas de las posiciones cerradas en un solo query
+    # (antes: 2 queries por posición), agrupadas en Python por investment_id.
+    closed_ids = [inv.id for inv in closed_investments]
+    buy_cost_by_inv: dict = {}
+    sell_value_by_inv: dict = {}
+    if closed_ids:
+        closed_txs = db.query(InvestmentTransaction).filter(
+            InvestmentTransaction.investment_id.in_(closed_ids)
         ).all()
+        for tx in closed_txs:
+            if tx.tx_type == "buy":
+                buy_cost_by_inv[tx.investment_id] = buy_cost_by_inv.get(tx.investment_id, 0.0) + tx.quantity * tx.price
+            elif tx.tx_type == "sell":
+                sell_value_by_inv[tx.investment_id] = sell_value_by_inv.get(tx.investment_id, 0.0) + tx.quantity * tx.price
 
-        sell_txs = db.query(InvestmentTransaction).filter(
-            and_(
-                InvestmentTransaction.investment_id == inv.id,
-                InvestmentTransaction.tx_type == "sell",
-            )
-        ).all()
-
-        # Calculate realized P&L from closed positions
-        total_buy_cost = sum(tx.quantity * tx.price for tx in buy_txs)
-        total_sell_value = sum(tx.quantity * tx.price for tx in sell_txs)
-        realized_pnl += total_sell_value - total_buy_cost
+    realized_pnl = sum(
+        sell_value_by_inv.get(inv.id, 0.0) - buy_cost_by_inv.get(inv.id, 0.0)
+        for inv in closed_investments
+    )
 
     # Use calculator to compute summary
     investment_summary = calculate_portfolio_summary(holdings, realized_pnl)
