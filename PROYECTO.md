@@ -71,8 +71,8 @@ Guita Coach es un gestor financiero personal diseñado específicamente para el 
 | Framework | Vanilla JS SPA (sin build step) |
 | Routing | Hash-based (`/#dashboard`, `/#transactions`, etc.) |
 | PWA | Service Worker con cache-first (static) + network-first (API) |
-| CSS | Custom design system, fuentes del sistema |
-| Gráficos | Chart.js (líneas, barras, dona) |
+| CSS | Custom design system según Manual de Marca Guita Coach v3.0 — tipografía Montserrat, negro absoluto + magenta eléctrico como único acento |
+| Gráficos | SVG/DOM a mano (sin librería) — donut de franjas, barras verticales apiladas por mes, barras de progreso |
 
 ### Infraestructura
 | Componente | Proveedor |
@@ -234,6 +234,7 @@ gustos_pct      FLOAT (default 30.0)
 ahorro_pct      FLOAT (default 20.0)
 payday          INTEGER (día del mes en que cobra)
 income_is_variable  BOOLEAN (presupuesto usa ingresos reales, no sueldo fijo)
+balance         FLOAT (default 0.0) -- balance de caja editable a mano desde el dashboard
 onboarding_done BOOLEAN
 created_at      DATETIME
 ```
@@ -650,13 +651,13 @@ Wrappers para todos los endpoints del backend. Maneja errores, serializa JSON, i
 Construye cards para cada fuente de datos:
 - **Gmail:** estado conexión, botón sincronizar, OAuth flow
 - **Mercado Pago:** estado, sincronizar wallet + CSV upload
-- **Plaid:** Plaid Link widget para bancos internacionales
-- **Prometeo:** modal con dropdown de banco + usuario + contraseña (bancos AR)
+- **Plaid:** Plaid Link widget para bancos internacionales — UI oculta (`PLAID_UI_ENABLED = false` en `settings.js`) mientras no sea prioridad de producto. Backend y endpoints intactos.
+- **Prometeo:** modal con dropdown de banco + usuario + contraseña (bancos AR) — UI oculta (`PROMETEO_UI_ENABLED = false` en `settings.js`). Google Safe Browsing marcó el dominio como phishing por este patrón (pedir credenciales bancarias reales en un dominio no-bancario); se ocultó hasta evaluar un flujo hosted del proveedor. Backend y endpoints intactos.
 - Budget settings: sliders de % de franjas, sueldo, día de cobro
 
 ### Service Worker (`sw.js`)
 
-Cache name actual: `guita-v8`
+Cache name actual: `guita-v12` — bump en cada cambio de assets estáticos, ver `sw.js`
 
 Estrategia:
 - **Cache-first:** assets estáticos (`/static/`, `sw.js`, favicons)
@@ -665,6 +666,15 @@ Estrategia:
 - Navegación SPA: retorna `index.html` en cache para rutas no-API
 
 ### Design system (`style.css`)
+
+Identidad de marca (Manual de Marca Guita Coach v3.0): tipografía Montserrat
+(pesos Light/Regular/Medium/SemiBold/Bold), monocromía estricta — negro
+absoluto (`--bg: #0A0A0C`) + blanco puro + escala de grises cubren 80-90% de
+cada pantalla. Magenta eléctrico (`--gold: #E91E8C`) es el único acento de
+marca (CTAs, estado activo, links). Colores funcionales (10-20% máx, nunca
+decorativos): azul niebla / amarillo suave / verde suave para las franjas
+necesidades/gustos/ahorro, rosa coral para alertas. No hay selector de temas
+— la marca exige una sola paleta, no variantes.
 
 Variables CSS personalizadas:
 ```css
@@ -911,8 +921,15 @@ Con `DEMO_MODE=True`:
 
 ### Presupuesto y alertas
 
-- El dashboard muestra tres barras de progreso (necesidades/gustos/ahorro)
-- Las alertas se generan automáticamente después de cada sync
+- El dashboard muestra un balance de caja editable a mano, la distribución
+  del gasto mensual por franja (necesidades/gustos/ahorro), una barra de
+  límite de gasto mensual, un donut de distribución y un gráfico de barras
+  apiladas con el gasto de los últimos meses. Selector de mes para ver
+  meses anteriores.
+- Las alertas se generan automáticamente después de cada sync (y, desde la
+  auditoría de agosto 2026, también al agregar una transacción manual —
+  antes ese endpoint llamaba a `run_alert_engine` sin `await` y la alerta
+  nunca se generaba)
 - Al llegar al 75% del límite: warning
 - Al llegar al 90%: crítico con consejo IA
 - Proyección fin de mes: si la velocidad de gasto actual supera el límite
@@ -959,11 +976,11 @@ ChatGPT puede dar consejos financieros genéricos, pero no sabe que gastaste $45
 **Específico para Argentina:**
 - Entiende el contexto de inflación (presupuesto en ARS, no en USD)
 - Dólar blue siempre visible
-- Bancos argentinos integrados (Prometeo)
+- Bancos argentinos integrados (Prometeo) — backend listo, UI oculta por ahora (ver nota en sección 8, `settings.js`)
 - Reglas de clasificación con los comercios reales (SUBE, Claro, EDENOR, etc.)
 - Inversiones: CEDEARs, bonos CER, benchmark vs MERVAL
 
 ---
 
-*Última actualización: julio 2026*  
+*Última actualización: agosto 2026*  
 *Stack: FastAPI + SQLAlchemy + Vanilla JS + Railway*
