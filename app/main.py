@@ -3,6 +3,7 @@ import logging
 import os
 
 from fastapi import FastAPI
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse
 
@@ -12,6 +13,10 @@ from .routers import auth, budget, transactions, insights, sync, advisor, chat, 
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Guita Coach", version="0.2.0", docs_url="/api/docs")
+# Sin build step (JS/CSS sin minificar ni bundlear): comprimir en runtime es
+# la ganancia de performance más barata disponible — reduce ~70-80% el peso
+# de texto (JS/CSS/JSON) en cada request.
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # ─── DB init on startup ───────────────────────────────────────────────────────
 @app.on_event("startup")
