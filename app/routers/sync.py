@@ -12,6 +12,7 @@ from ..services.classifier import classify
 from ..services.alert_engine import run_alert_engine
 from ..services.plaid_sync import plaid_client
 from ..services.prometeo_api import get_prometeo_client
+from ..services.crypto import encrypt, decrypt
 
 router = APIRouter(prefix="/api/sync", tags=["sync"])
 
@@ -107,7 +108,7 @@ async def sync_gmail(background_tasks: BackgroundTasks, db: Session = Depends(ge
 
     from ..services.gmail import fetch_payment_emails
     try:
-        items = await fetch_payment_emails(conn.access_token)
+        items = await fetch_payment_emails(decrypt(conn.access_token))
     except Exception as e:
         raise HTTPException(502, f"Error al leer Gmail: {str(e)}")
 
@@ -131,7 +132,7 @@ async def sync_mp(background_tasks: BackgroundTasks, db: Session = Depends(get_d
 
     from ..services.mercadopago import fetch_movements
     try:
-        items = await fetch_movements(conn.access_token)
+        items = await fetch_movements(decrypt(conn.access_token))
     except Exception as e:
         raise HTTPException(502, f"Error al leer Mercado Pago: {str(e)}")
 
@@ -214,14 +215,14 @@ async def exchange_plaid_token(
     ).first()
 
     if connection:
-        connection.access_token = access_token
+        connection.access_token = encrypt(access_token)
         connection.status = 'connected'
         connection.last_sync = datetime.utcnow()
     else:
         connection = Connection(
             user_id=user.id,
             provider='plaid',
-            access_token=access_token,
+            access_token=encrypt(access_token),
             status='connected',
             last_sync=datetime.utcnow()
         )
@@ -247,7 +248,7 @@ async def sync_plaid_transactions(
         raise HTTPException(status_code=400, detail="Plaid no está conectado")
 
     # Obtener transacciones
-    transactions = await plaid_client.get_transactions(connection.access_token, days=90)
+    transactions = await plaid_client.get_transactions(decrypt(connection.access_token), days=90)
 
     # Convertir formato Plaid al formato esperado
     items = []
@@ -332,14 +333,14 @@ async def prometeo_login(
     # Guardar sesión en BD
     conn = db.query(Connection).filter_by(user_id=user.id, provider="prometeo").first()
     if conn:
-        conn.access_token = session_key
+        conn.access_token = encrypt(session_key)
         conn.status = "connected"
         conn.last_sync = datetime.utcnow()
     else:
         conn = Connection(
             user_id=user.id,
             provider="prometeo",
-            access_token=session_key,
+            access_token=encrypt(session_key),
             status="connected",
             last_sync=datetime.utcnow(),
         )
@@ -364,7 +365,7 @@ async def sync_prometeo_transactions(
     if not conn or conn.status != "connected":
         raise HTTPException(status_code=400, detail="Prometeo no conectado. Conectá tu banco primero.")
 
-    session_key = conn.access_token
+    session_key = decrypt(conn.access_token)
 
     # Obtener cuentas
     accounts = await client.get_accounts(session_key)
