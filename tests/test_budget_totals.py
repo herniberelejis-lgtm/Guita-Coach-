@@ -10,7 +10,7 @@ def mem_db():
     Session = sessionmaker(bind=engine)
     s = Session()
     user = User(id=1, monthly_income=100000, necesidades_pct=50, gustos_pct=30, ahorro_pct=20,
-                onboarding_done=True, payday=1, name="Test")
+                onboarding_done=True, payday=1, name="Test", balance=75000)
     s.add(user)
     s.add(Transaction(user_id=1, tx_type="income", amount=100000, category="ingreso",
                       date="2026-05-01", month="2026-05", source="mercadopago",
@@ -39,7 +39,10 @@ def test_franja_data_only_counts_expenses(mem_db):
 
 
 def test_budget_totals_fields(mem_db):
-    """get_current_budget must return total_income, total_expenses, balance, pending_count."""
+    """get_current_budget must return total_income, total_expenses, balance, pending_count.
+
+    `balance` is the user-editable cash balance (User.balance), not income-expenses —
+    it passes through unchanged regardless of the month's transactions."""
     import datetime
     from unittest.mock import patch
     from app.routers.budget import get_current_budget
@@ -51,7 +54,7 @@ def test_budget_totals_fields(mem_db):
 
     assert result["total_income"] == 100000.0
     assert result["total_expenses"] == 25000.0
-    assert result["balance"] == 75000.0
+    assert result["balance"] == 75000.0, "balance debe reflejar User.balance (editable), no income-expenses"
     assert result["pending_count"] == 1
 
 

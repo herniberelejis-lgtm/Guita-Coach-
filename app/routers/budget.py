@@ -8,6 +8,7 @@ from ..database import get_db
 from ..models import User, Transaction, Alert
 from ..security import get_current_user
 from ..services.splits import expense_amount, reimbursement_map
+from ..services.date_utils import days_in_month as _days_in_month
 
 router = APIRouter(prefix="/api/budget", tags=["budget"])
 
@@ -96,8 +97,7 @@ def get_current_budget(month: Optional[str] = None, db: Session = Depends(get_db
         Transaction.status.in_(["confirmed", "classified"])
     ).all()
 
-    days_in_month = (date(target.year, target.month % 12 + 1, 1) - date(target.year, target.month, 1)).days \
-        if target.month < 12 else (date(target.year + 1, 1, 1) - date(target.year, target.month, 1)).days
+    days_in_month = _days_in_month(target.year, target.month)
     days_passed = now.day if is_current else days_in_month
 
     days_remaining = max(days_in_month - days_passed, 1) if is_current else 0

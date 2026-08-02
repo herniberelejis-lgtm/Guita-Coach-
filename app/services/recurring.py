@@ -3,9 +3,18 @@
 Idempotente: cada RecurringExpense recuerda el último mes aplicado
 (`last_applied_month`), así puede correrse en cada carga del dashboard
 sin duplicar nada.
+
+`apply_recurring` corre en cada request a /api/budget/current — con el
+dashboard disparando varios fetches por carga de página, dos requests
+concurrentes pueden pasar el chequeo `last_applied_month == month` en
+Python antes de que ninguna haga commit (TOCTOU). Por eso el "gano yo"
+se resuelve con un UPDATE condicional atómico a nivel de base de datos
+(la fila solo se actualiza si nadie más la tocó primero), no con una
+lectura en Python seguida de una escritura.
 """
 from datetime import date
 
+from sqlalchemy import or_, update
 from sqlalchemy.orm import Session
 
 from ..models import RecurringExpense, Transaction
@@ -26,12 +35,45 @@ def apply_recurring(db: Session, user_id: int, today: date | None = None) -> int
 
         if item.installments_total > 0 and item.installments_paid >= item.installments_total:
             item.active = False
+            db.commit()
+            continue
+
+        # Snapshot ANTES del UPDATE: SQLAlchemy sincroniza el objeto ORM en
+        # memoria apenas se ejecuta un update() con WHERE evaluable, no recién
+        # al commitear — leer item.installments_paid después ya daría el
+        # valor nuevo (bug detectado y corregido acá mismo).
+        installments_paid_before = item.installments_paid
+
+        # Gana la carrera quien logre este UPDATE primero: si otro request ya
+        # marcó este item para el mes (o lo desactivó) entre nuestro SELECT y
+        # este punto, rowcount da 0 y no se crea una transacción duplicada.
+        result = db.execute(
+            update(RecurringExpense)
+            .where(
+                RecurringExpense.id == item.id,
+                # != no matchea NULL (lógica de 3 valores de SQL) — un item
+                # recién creado tiene last_applied_month=None, así que hay
+                # que admitirlo explícitamente además del caso "mes distinto".
+                or_(
+                    RecurringExpense.last_applied_month != month,
+                    RecurringExpense.last_applied_month.is_(None),
+                ),
+                RecurringExpense.active == True,
+            )
+            .values(
+                last_applied_month=month,
+                installments_paid=RecurringExpense.installments_paid + (1 if item.installments_total > 0 else 0),
+            )
+        )
+        if result.rowcount == 0:
+            db.rollback()
             continue
 
         day = min(item.day_of_month, 28)
         merchant = item.merchant
+        installments_paid_now = installments_paid_before + 1 if item.installments_total > 0 else 0
         if item.installments_total > 0:
-            merchant = f"{item.merchant} (cuota {item.installments_paid + 1}/{item.installments_total})"
+            merchant = f"{item.merchant} (cuota {installments_paid_now}/{item.installments_total})"
 
         db.add(Transaction(
             user_id=user_id,
@@ -47,15 +89,13 @@ def apply_recurring(db: Session, user_id: int, today: date | None = None) -> int
             confidence=1.0,
             rule_used="recurring",
         ))
-        item.last_applied_month = month
-        if item.installments_total > 0:
-            item.installments_paid += 1
-            if item.installments_paid >= item.installments_total:
-                item.active = False
+        if item.installments_total > 0 and installments_paid_now >= item.installments_total:
+            db.execute(
+                update(RecurringExpense).where(RecurringExpense.id == item.id).values(active=False)
+            )
+        db.commit()
         created += 1
 
-    if created:
-        db.commit()
     return created
 
 
