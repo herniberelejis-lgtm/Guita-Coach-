@@ -77,12 +77,6 @@ const API = {
   syncGmail:  () => API.post('/sync/gmail'),
   syncMP:     () => API.post('/sync/mp'),
   syncStatus: () => API.get('/sync/status'),
-  getPlaidLinkToken: () => API.post('/sync/plaid/link_token', {}),
-  exchangePlaidToken: (public_token) => API.post('/sync/plaid/exchange_token', { public_token }),
-  syncPlaidTransactions: () => API.post('/sync/plaid/sync', {}),
-  listPrometeoProviders: () => API.get('/sync/prometeo/providers'),
-  prometeoLogin: (provider, username, password, doc_type) => API.post('/sync/prometeo/login', { provider, username, password, doc_type }),
-  syncPrometeoTransactions: () => API.post('/sync/prometeo/sync', {}),
 
   // Auth
   register: (d) => API.post('/auth/register', d),

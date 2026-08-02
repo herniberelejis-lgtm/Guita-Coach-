@@ -642,7 +642,6 @@ Wrappers para todos los endpoints del backend. Maneja errores, serializa JSON, i
 - `API.budget()`, `API.updateBudgetSettings()`
 - `API.listTransactions()`, `API.addTransaction()`, `API.correctCategory()`
 - `API.syncGmail()`, `API.syncMP()`, `API.uploadCSV()`
-- `API.listPrometeoProviders()`, `API.prometeoLogin()`, `API.syncPrometeoTransactions()`
 - `API.listHoldings()`, `API.getSummary()`, `API.uploadInvestmentCSV()`
 - `API.chat()`, `API.getInsights()`, `API.getDolar()`
 
@@ -651,9 +650,17 @@ Wrappers para todos los endpoints del backend. Maneja errores, serializa JSON, i
 Construye cards para cada fuente de datos:
 - **Gmail:** estado conexión, botón sincronizar, OAuth flow
 - **Mercado Pago:** estado, sincronizar wallet + CSV upload
-- **Plaid:** Plaid Link widget para bancos internacionales — UI oculta (`PLAID_UI_ENABLED = false` en `settings.js`) mientras no sea prioridad de producto. Backend y endpoints intactos.
-- **Prometeo:** modal con dropdown de banco + usuario + contraseña (bancos AR) — UI oculta (`PROMETEO_UI_ENABLED = false` en `settings.js`). Google Safe Browsing marcó el dominio como phishing por este patrón (pedir credenciales bancarias reales en un dominio no-bancario); se ocultó hasta evaluar un flujo hosted del proveedor. Backend y endpoints intactos.
 - Budget settings: sliders de % de franjas, sueldo, día de cobro
+
+**Plaid y Prometeo:** removidos del todo de la UI de Configuración (no solo ocultos) —
+por ahora no se pueden conectar. Se sacaron las cards, los flujos de conexión
+(`_buildPlaidCard`, `_initPlaidLink`, `_openPlaidLink`, `_buildPrometeoCard`,
+`_initPrometeoLink`) y los wrappers de `api.js` (`getPlaidLinkToken`,
+`exchangePlaidToken`, `syncPlaidTransactions`, `listPrometeoProviders`,
+`prometeoLogin`, `syncPrometeoTransactions`). El backend y los endpoints
+(`/sync/plaid/*`, `/sync/prometeo/*`) quedan intactos por si se retoman más
+adelante — ver también la nota sobre el aviso de phishing de Google Safe
+Browsing que motivó ocultar Prometeo originalmente.
 
 ### Service Worker (`sw.js`)
 
@@ -669,12 +676,17 @@ Estrategia:
 
 Identidad de marca (Manual de Marca Guita Coach v3.0): tipografía Montserrat
 (pesos Light/Regular/Medium/SemiBold/Bold), monocromía estricta — negro
-absoluto (`--bg: #0A0A0C`) + blanco puro + escala de grises cubren 80-90% de
-cada pantalla. Magenta eléctrico (`--gold: #E91E8C`) es el único acento de
-marca (CTAs, estado activo, links). Colores funcionales (10-20% máx, nunca
-decorativos): azul niebla / amarillo suave / verde suave para las franjas
-necesidades/gustos/ahorro, rosa coral para alertas. No hay selector de temas
-— la marca exige una sola paleta, no variantes.
+absoluto cálido/grafito (`--bg: #121110`) + blanco puro + escala de grises
+cubren 80-90% de cada pantalla. Magenta eléctrico (`--gold: #E91E8C`) es el
+único acento de marca (CTAs, estado activo, links). Colores funcionales
+(10-20% máx, nunca decorativos): azul niebla / amarillo suave / verde suave
+para las franjas necesidades/gustos/ahorro, rosa coral para alertas. No hay
+selector de temas — la marca exige una sola paleta, no variantes.
+
+Íconos: sin emojis como íconos estructurales (ver `static/js/icons.js`) —
+un set propio de SVG lineales (stroke 1.75px, trazos consistentes) reemplaza
+los pictogramas de color que se usaban antes en botones, gates y estados
+vacíos, para evitar la estética genérica de "UI generada por IA".
 
 Variables CSS personalizadas:
 ```css
@@ -976,7 +988,7 @@ ChatGPT puede dar consejos financieros genéricos, pero no sabe que gastaste $45
 **Específico para Argentina:**
 - Entiende el contexto de inflación (presupuesto en ARS, no en USD)
 - Dólar blue siempre visible
-- Bancos argentinos integrados (Prometeo) — backend listo, UI oculta por ahora (ver nota en sección 8, `settings.js`)
+- Bancos argentinos integrados (Prometeo) — backend listo, UI removida de Configuración por ahora (ver nota en sección 8, `settings.js`)
 - Reglas de clasificación con los comercios reales (SUBE, Claro, EDENOR, etc.)
 - Inversiones: CEDEARs, bonos CER, benchmark vs MERVAL
 

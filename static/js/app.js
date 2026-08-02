@@ -69,7 +69,7 @@ const App = {
     const list = document.getElementById('notif-list');
     if (!list) return;
     if (!alerts.length) {
-      list.innerHTML = '<div class="notif-empty">Sin notificaciones. Todo en orden 👌</div>';
+      list.innerHTML = '<div class="notif-empty">Sin notificaciones. Todo en orden.</div>';
       return;
     }
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>

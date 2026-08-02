@@ -165,7 +165,8 @@ const Transactions = {
 
       const aiBtn = document.createElement('button');
       aiBtn.className = 'btn btn-primary btn-sm';
-      aiBtn.textContent = '✨ Categorizar con IA';
+      aiBtn.innerHTML = Icon('sparkle', 14) + ' Categorizar con IA';
+      aiBtn.style.cssText = 'display:inline-flex;align-items:center;gap:6px;';
       aiBtn.onclick = async function() {
         aiBtn.disabled = true;
         aiBtn.textContent = 'Catalogando…';
@@ -176,7 +177,7 @@ const Transactions = {
         } catch (err) {
           App.toast(err.message, 'error');
           aiBtn.disabled = false;
-          aiBtn.textContent = '✨ Categorizar con IA';
+          aiBtn.innerHTML = Icon('sparkle', 14) + ' Categorizar con IA';
         }
       };
 

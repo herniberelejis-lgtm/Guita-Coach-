@@ -62,9 +62,11 @@ const Goals = {
     const usd = g.currency === 'ARS' && dolar?.blue?.venta
       ? ' (~US$' + Math.round(g.saved_amount / dolar.blue.venta).toLocaleString('es-AR') + ')'
       : '';
+    const goalIcon = _el('span', { style: 'display:inline-flex;align-items:center;margin-right:6px;color:' + (g.is_done ? 'var(--ok)' : 'var(--color-accent)') + ';' });
+    goalIcon.innerHTML = Icon(g.is_done ? 'check-circle' : 'target', 15);
     const card = _el('div', { className: 'goal-card' + (g.is_done ? ' done' : '') },
       _el('div', { className: 'goal-head' },
-        _el('strong', {}, (g.is_done ? '✅ ' : '🎯 ') + g.name),
+        _el('strong', {}, goalIcon, g.name),
         _el('span', { className: 'goal-amounts' },
           App.fmt(g.saved_amount) + usd + ' / ' + App.fmt(g.target_amount) +
           (g.currency === 'USD' ? ' USD' : ''))
@@ -83,8 +85,10 @@ const Goals = {
       )
     );
     (g.subgoals || []).forEach(sub => {
+      const subIcon = _el('span', { style: 'display:inline-flex;align-items:center;margin-right:5px;color:' + (sub.is_done ? 'var(--ok)' : 'var(--muted)') + ';' });
+      subIcon.innerHTML = sub.is_done ? Icon('check-circle', 12) : '·';
       card.appendChild(_el('div', { className: 'subgoal' },
-        _el('span', {}, (sub.is_done ? '✅' : '·') + ' ' + sub.name),
+        _el('span', {}, subIcon, sub.name),
         _el('span', { style: 'color:var(--muted)' },
           App.fmt(sub.saved_amount) + ' / ' + App.fmt(sub.target_amount)),
         _el('button', { className: 'btn-link', onclick: () => Goals._contribute(sub) }, 'Aportar')
@@ -114,7 +118,7 @@ const Goals = {
     if (!amount || amount <= 0) return;
     try {
       await API.contributeGoal(g.id, amount);
-      App.toast('Aporte registrado 💪', 'success');
+      App.toast('Aporte registrado', 'success');
       this.render();
     } catch (e) { App.toast(e.message, 'error'); }
   },
@@ -133,7 +137,7 @@ const Goals = {
     const target = parseFloat(prompt('Monto objetivo ($):'));
     if (!target || target <= 0) return;
     API.createGoal({ name, target_amount: target, parent_id: parentId || null })
-      .then(() => { App.toast('Meta creada 🎯', 'success'); this.render(); })
+      .then(() => { App.toast('Meta creada', 'success'); this.render(); })
       .catch(e => App.toast(e.message, 'error'));
   },
 
