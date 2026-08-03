@@ -1,7 +1,7 @@
 """Auth: registro/login con sesiones + OAuth flows para Gmail y Mercado Pago."""
 import secrets
-import time
 from datetime import datetime
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
@@ -92,15 +92,20 @@ def login_providers():
 
 
 def _login_state(response: Response) -> str:
-    """Generate state and bind to session via cookie."""
+    """Genera un state y lo ata al browser vía cookie (anti Login-CSRF).
+
+    `secure` se deriva de APP_URL igual que la cookie de sesión: si se fuerza
+    True en desarrollo sobre http, el browser descarta la cookie y el callback
+    falla siempre con "Estado OAuth inválido".
+    """
     state = secrets.token_urlsafe(16)
     response.set_cookie(
         "oauth_state",
         state,
         max_age=600,
         httponly=True,
-        secure=True,
-        samesite="lax"
+        secure=get_settings().app_url.startswith("https://"),
+        samesite="lax",
     )
     return state
 
@@ -137,14 +142,14 @@ def google_login():
     response = Response(status_code=307)
     state = _login_state(response)
 
-    redirect = f"{settings.app_url}/api/auth/google/login/callback"
     response.headers["Location"] = (
-        "https://accounts.google.com/o/oauth2/v2/auth"
-        f"?client_id={settings.google_client_id}"
-        f"&redirect_uri={redirect}"
-        "&response_type=code"
-        "&scope=openid%20email%20profile"
-        f"&state={state}"
+        "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode({
+            "client_id": settings.google_client_id,
+            "redirect_uri": f"{settings.app_url}/api/auth/google/login/callback",
+            "response_type": "code",
+            "scope": "openid email profile",
+            "state": state,
+        })
     )
     return response
 
@@ -192,13 +197,14 @@ def mp_login():
     response = Response(status_code=307)
     state = _login_state(response)
 
-    redirect = f"{settings.app_url}/api/auth/mp/login/callback"
     response.headers["Location"] = (
-        "https://auth.mercadopago.com/authorization"
-        f"?client_id={settings.mp_client_id}"
-        f"&redirect_uri={redirect}"
-        "&response_type=code"
-        f"&state={state}"
+        "https://auth.mercadopago.com/authorization?" + urlencode({
+            "client_id": settings.mp_client_id,
+            "redirect_uri": f"{settings.app_url}/api/auth/mp/login/callback",
+            "response_type": "code",
+            "platform_id": "mp",  # requerido por Mercado Pago
+            "state": state,
+        })
     )
     return response
 
@@ -239,20 +245,20 @@ async def mp_login_callback(request: Request, code: str, state: str, db: Session
     return response
 
 
-# ─── Estado OAuth: state → user_id ──────────────────────────────────────────
-_oauth_states: dict[str, int] = {}
+# ─── Estado OAuth de los flujos de conexión ─────────────────────────────────
+# Antes esto era un dict en memoria (state → user_id). No sobrevivía a los
+# redeploys ni a correr más de una instancia: el usuario iba a Google, volvía,
+# y el state ya no estaba → 400 "Estado OAuth inválido" en cada intento.
+# Ahora el state va en cookie (igual que el login) y el usuario sale de la
+# sesión, que es la fuente de verdad de quién está conectando.
 
 
-def _new_state(user_id: int) -> str:
-    state = secrets.token_urlsafe(16)
-    _oauth_states[state] = user_id
-    return state
-
-
-def _pop_state(state: str) -> int:
-    if state not in _oauth_states:
-        raise HTTPException(400, "Estado OAuth inválido")
-    return _oauth_states.pop(state)
+def _redirect_with_state(url_builder, response: Response) -> Response:
+    """Setea la cookie de state y redirige a la URL del proveedor."""
+    state = _login_state(response)
+    response.status_code = 307
+    response.headers["Location"] = url_builder(state)
+    return response
 
 
 def _save_tokens(db: Session, user_id: int, provider: str, tokens: dict) -> None:
@@ -270,40 +276,56 @@ def _save_tokens(db: Session, user_id: int, provider: str, tokens: dict) -> None
 
 # ─── Gmail ──────────────────────────────────────────────────────────────────
 @router.get("/gmail")
-def gmail_connect(user: User = Depends(get_current_user)):
+def gmail_connect(response: Response, user: User = Depends(get_current_user)):
     settings = get_settings()
     if not settings.gmail_enabled:
         raise HTTPException(400, "Gmail OAuth no configurado. Agregá GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en .env")
     from ..services.gmail import get_oauth_url
-    return RedirectResponse(get_oauth_url(_new_state(user.id)))
+    return _redirect_with_state(get_oauth_url, response)
 
 
 @router.get("/gmail/callback")
-async def gmail_callback(code: str, state: str, db: Session = Depends(get_db)):
-    user_id = _pop_state(state)
+async def gmail_callback(
+    request: Request,
+    code: str,
+    state: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _check_login_state(request, state)
     from ..services.gmail import exchange_code
     tokens = await exchange_code(code)
-    _save_tokens(db, user_id, "gmail", tokens)
-    return RedirectResponse("/#connections?gmail=ok")
+    _save_tokens(db, user.id, "gmail", tokens)
+    resp = RedirectResponse("/#settings?gmail=ok")
+    resp.delete_cookie("oauth_state")
+    return resp
 
 
 # ─── Mercado Pago ─────────────────────────────────────────────────────────
 @router.get("/mp")
-def mp_connect(user: User = Depends(get_current_user)):
+def mp_connect(response: Response, user: User = Depends(get_current_user)):
     settings = get_settings()
     if not settings.mp_enabled:
         raise HTTPException(400, "Mercado Pago OAuth no configurado. Agregá MP_CLIENT_ID y MP_CLIENT_SECRET en .env")
     from ..services.mercadopago import get_oauth_url
-    return RedirectResponse(get_oauth_url(_new_state(user.id)))
+    return _redirect_with_state(get_oauth_url, response)
 
 
 @router.get("/mp/callback")
-async def mp_callback(code: str, state: str, db: Session = Depends(get_db)):
-    user_id = _pop_state(state)
+async def mp_callback(
+    request: Request,
+    code: str,
+    state: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _check_login_state(request, state)
     from ..services.mercadopago import exchange_code
     tokens = await exchange_code(code)
-    _save_tokens(db, user_id, "mercadopago", tokens)
-    return RedirectResponse("/#connections?mp=ok")
+    _save_tokens(db, user.id, "mercadopago", tokens)
+    resp = RedirectResponse("/#settings?mp=ok")
+    resp.delete_cookie("oauth_state")
+    return resp
 
 
 # ─── Disconnect ──────────────────────────────────────────────────────────────

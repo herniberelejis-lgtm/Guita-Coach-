@@ -27,17 +27,17 @@ def _extract_sender_name(msg: dict) -> str:
     return match.group(1).strip() if match else sender
 
 def get_oauth_url(state: str) -> str:
+    from urllib.parse import urlencode
     settings = get_settings()
-    redirect = f"{settings.app_url}/api/auth/gmail/callback"
-    return (
-        "https://accounts.google.com/o/oauth2/v2/auth"
-        f"?client_id={settings.google_client_id}"
-        f"&redirect_uri={redirect}"
-        f"&response_type=code"
-        f"&scope=https://www.googleapis.com/auth/gmail.readonly"
-        f"&access_type=offline&prompt=consent"
-        f"&state={state}"
-    )
+    return "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode({
+        "client_id": settings.google_client_id,
+        "redirect_uri": f"{settings.app_url}/api/auth/gmail/callback",
+        "response_type": "code",
+        "scope": " ".join(SCOPES),
+        "access_type": "offline",
+        "prompt": "consent",
+        "state": state,
+    })
 
 async def exchange_code(code: str) -> dict:
     import httpx

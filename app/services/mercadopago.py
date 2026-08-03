@@ -8,15 +8,15 @@ from typing import List, Dict
 from ..config import get_settings
 
 def get_oauth_url(state: str) -> str:
+    from urllib.parse import urlencode
     settings = get_settings()
-    redirect = f"{settings.app_url}/api/auth/mp/callback"
-    return (
-        "https://auth.mercadopago.com/authorization"
-        f"?client_id={settings.mp_client_id}"
-        f"&redirect_uri={redirect}"
-        f"&response_type=code"
-        f"&state={state}"
-    )
+    return "https://auth.mercadopago.com/authorization?" + urlencode({
+        "client_id": settings.mp_client_id,
+        "redirect_uri": f"{settings.app_url}/api/auth/mp/callback",
+        "response_type": "code",
+        "platform_id": "mp",  # requerido por Mercado Pago
+        "state": state,
+    })
 
 async def exchange_code(code: str) -> dict:
     import httpx
