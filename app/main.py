@@ -10,6 +10,12 @@ from fastapi.responses import FileResponse, HTMLResponse
 from .database import init_db
 from .routers import auth, budget, transactions, insights, sync, advisor, chat, goals, investments, investments_extra, academy
 
+# Sin esto, uvicorn solo configura sus propios loggers y los INFO de la app
+# (entre ellos los redirect_uri de OAuth) nunca llegan a los logs del deploy.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s:     %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Guita Coach", version="0.2.0", docs_url="/api/docs")
@@ -38,6 +44,25 @@ async def startup():
             "Generá uno propio (python -c \"import secrets; print(secrets.token_hex(32))\") y "
             "seteá SECRET_KEY antes de manejar datos reales."
         )
+
+    # Los redirect_uri salen todos de APP_URL. Cuando no coinciden con lo
+    # registrado en Google/Mercado Pago el error es redirect_uri_mismatch, que
+    # no dice cuál es la URI que se mandó — dejarlas en el log de arranque
+    # convierte ese diagnóstico en mirar una línea.
+    if settings.gmail_enabled or settings.mp_enabled:
+        logger.info("APP_URL = %s", settings.app_url)
+        logger.info("Redirect URIs que esta instancia va a usar (deben estar registradas):")
+        if settings.gmail_enabled:
+            logger.info("  Google (login)  %s/api/auth/google/login/callback", settings.app_url)
+            logger.info("  Gmail (conexión) %s/api/auth/gmail/callback", settings.app_url)
+        if settings.mp_enabled:
+            logger.info("  MP (login)      %s/api/auth/mp/login/callback", settings.app_url)
+            logger.info("  MP (conexión)   %s/api/auth/mp/callback", settings.app_url)
+        if settings.app_url.startswith("http://localhost"):
+            logger.warning(
+                "APP_URL sigue en el default (localhost): en un deploy real todos los "
+                "flujos de OAuth van a fallar con redirect_uri_mismatch."
+            )
 
     if settings.demo_mode:
         from .services.seed import seed_demo_data
