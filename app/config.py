@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from functools import lru_cache
 
 class Settings(BaseSettings):
@@ -22,6 +23,18 @@ class Settings(BaseSettings):
     demo_mode: bool = False  # nunca por defecto: debe activarse a propósito (fail-closed)
     live_prices: bool = True  # obtener precios de mercado en tiempo real (Yahoo/CoinGecko)
     database_url: str = ""  # postgres en prod (Railway inyecta DATABASE_URL); vacío = sqlite local
+
+    @field_validator("app_url")
+    @classmethod
+    def _normalize_app_url(cls, v: str) -> str:
+        """Saca la barra final y espacios de APP_URL.
+
+        Todos los redirect_uri de OAuth se arman como f"{app_url}/api/auth/...".
+        Si APP_URL viene con barra al final ("https://guitacoach.com/"), queda
+        una doble barra en el medio y Google/Mercado Pago lo rechazan con
+        redirect_uri_mismatch, que es muy difícil de ver a simple vista.
+        """
+        return v.strip().rstrip("/")
 
     @property
     def claude_enabled(self) -> bool:

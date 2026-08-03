@@ -106,3 +106,18 @@ def test_callback_rechaza_state_que_no_coincide(client):
     )
     assert r.status_code == 400
     assert "Estado OAuth inválido" in r.text
+
+
+@pytest.mark.parametrize("raw", [
+    "https://guitacoach.com/",
+    "https://guitacoach.com//",
+    "  https://guitacoach.com  ",
+])
+def test_app_url_normaliza_barra_final(monkeypatch, raw):
+    """APP_URL con barra al final genera '//' y rompe el redirect_uri."""
+    monkeypatch.setenv("APP_URL", raw)
+    get_settings.cache_clear()
+    try:
+        assert get_settings().app_url == "https://guitacoach.com"
+    finally:
+        get_settings.cache_clear()
