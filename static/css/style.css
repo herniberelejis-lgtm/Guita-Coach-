@@ -3,10 +3,11 @@
 
 /* ── Identidad de marca (Manual de Marca Guita Coach v3.0) ──────────────────
    Monocromía estricta: negro absoluto + blanco puro + grises = 80-90% de la
-   superficie. Magenta eléctrico es el ÚNICO acento de marca (CTAs, estado
-   activo, links). Azul niebla / verde suave / amarillo suave / rosa coral
-   son colores FUNCIONALES (franjas y semántica financiera), nunca decoración
-   — entre todos no deben superar el 10-20% de la superficie de una pantalla. */
+   superficie. Verde esmeralda es el ÚNICO acento de marca (CTAs, estado
+   activo, links) — reemplazó al magenta del manual v3.0 por decisión de
+   producto. Sin rosas ni violetas en ningún lado. Azul niebla / verde suave /
+   amarillo suave son colores FUNCIONALES (franjas y semántica financiera),
+   nunca decoración — entre todos no deben superar el 10-20% de la pantalla. */
 :root {
   --bg:      #121110;   /* negro absoluto (grafito cálido) */
   --navy:    #121110;   /* kept for JS compat */
@@ -24,7 +25,7 @@
   --ahorro:      #7FB89C;  /* verde suave: crecimiento y señales positivas */
 
   /* Semántica financiera (positivo/negativo), heredada de los colores funcionales */
-  --danger:  #E58A93;   /* rosa coral: alertas y excesos */
+  --danger:  #E5544B;   /* rojo terracota: alertas y excesos (sin rosa) */
   --warn:    #E3C27E;   /* amarillo suave */
   --ok:      #7FB89C;   /* verde suave */
 
