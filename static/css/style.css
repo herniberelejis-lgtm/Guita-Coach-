@@ -62,15 +62,23 @@ a { color: var(--gold); text-decoration: none; }
 }
 
 .sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 0 24px 28px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.sidebar-logo-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  flex-shrink: 0;
 }
 .sidebar-logo h1 {
   font-size: 1.4rem;
   color: var(--white);
   letter-spacing: .5px;
 }
-.sidebar-logo span { font-family: var(--font-body); font-size: .75rem; color: var(--muted); }
 
 nav { margin-top: 16px; flex: 1; }
 
