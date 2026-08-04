@@ -75,6 +75,14 @@ async def privacy_policy():
     content = open(page, encoding="utf-8").read()
     return HTMLResponse(content=content, headers={"Cache-Control": "no-store"})
 
+@app.get("/terminos", include_in_schema=False)
+@app.get("/terms", include_in_schema=False)
+async def terms_of_service():
+    """Términos y condiciones — ruta explícita antes del catch-all SPA."""
+    page = os.path.join(static_path, "terminos.html")
+    content = open(page, encoding="utf-8").read()
+    return HTMLResponse(content=content, headers={"Cache-Control": "no-store"})
+
 @app.get("/{full_path:path}", include_in_schema=False)
 async def spa_fallback(full_path: str):
     index = os.path.join(static_path, "index.html")

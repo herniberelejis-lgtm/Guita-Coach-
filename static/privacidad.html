@@ -17,71 +17,108 @@
     ul { padding-left: 22px; }
     li { margin-bottom: 6px; }
     .badge { display: inline-block; background: #dbeafe; color: #1d4ed8; padding: 2px 8px; border-radius: 4px; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+    .notice { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 14px 16px; margin: 20px 0; font-size: 14px; color: #1e3a8a; }
     a { color: #2563eb; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+    th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: #6b7280; padding: 8px; border-bottom: 1px solid #e5e7eb; }
+    td { padding: 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
     footer { text-align: center; padding: 24px; font-size: 13px; color: #888; }
+    nav.toc { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px 20px; margin-top: 24px; }
+    nav.toc ol { padding-left: 20px; }
+    nav.toc li { font-size: 14px; margin-bottom: 4px; }
+    nav.toc a { text-decoration: none; }
   </style>
 </head>
 <body>
   <div class="header">
     <div class="inner">
       <h1>🎯 Guita Coach</h1>
-      <p>Política de Privacidad — Última actualización: Junio 2026</p>
+      <p>Política de Privacidad — Última actualización: 4 de agosto de 2026</p>
     </div>
   </div>
 
   <main>
-    <p>En <strong>Guita Coach</strong> nos tomamos tu privacidad muy en serio. Esta política describe cómo recopilamos, usamos y protegemos tu información personal.</p>
+    <p>En <strong>Guita Coach</strong> nos tomamos tu privacidad en serio. Esta política describe qué datos recopilamos, para qué los usamos y qué derechos tenés sobre ellos, conforme a la Ley 25.326 de Protección de Datos Personales de la República Argentina y las disposiciones de la Agencia de Acceso a la Información Pública (AAIP).</p>
 
-    <h2>1. Información que recopilamos</h2>
+    <nav class="toc" aria-label="Índice">
+      <ol>
+        <li><a href="#responsable">Quién es el responsable</a></li>
+        <li><a href="#info">Información que recopilamos</a></li>
+        <li><a href="#uso">Cómo usamos tu información</a></li>
+        <li><a href="#google">Uso de datos de Google</a></li>
+        <li><a href="#seguridad">Seguridad</a></li>
+        <li><a href="#internacional">Transferencia internacional de datos</a></li>
+        <li><a href="#retencion">Retención de datos</a></li>
+        <li><a href="#derechos">Tus derechos</a></li>
+        <li><a href="#contacto">Contacto</a></li>
+        <li><a href="#cambios">Cambios en esta política</a></li>
+      </ol>
+    </nav>
+
+    <h2 id="responsable">1. Quién es el responsable</h2>
+    <p><strong>BAK S.A.S.</strong>, CUIT 33-71678145-9, con domicilio en la Provincia de Córdoba, Argentina, es responsable del tratamiento de los datos personales que recopila Guita Coach.</p>
+
+    <h2 id="info">2. Información que recopilamos</h2>
     <ul>
-      <li><strong>Cuenta:</strong> nombre, dirección de correo electrónico y contraseña.</li>
-      <li><strong>Datos financieros:</strong> transacciones bancarias, categorías de gastos y presupuestos que vos cargás o sincronizás.</li>
-      <li><strong>Gmail (opcional):</strong> si conectás Gmail, leemos únicamente emails de pagos y recibos para importar transacciones. Nunca leemos emails personales.</li>
-      <li><strong>Credenciales bancarias (Prometeo):</strong> si usás la sincronización bancaria, tus credenciales se envían de forma cifrada a Prometeo para obtener tus movimientos. No las almacenamos en nuestros servidores.</li>
+      <li><strong>Cuenta:</strong> nombre, dirección de correo electrónico y contraseña (nunca la guardamos en texto plano — ver sección de seguridad).</li>
+      <li><strong>Datos financieros:</strong> transacciones, categorías de gastos y presupuestos que vos cargás manualmente o sincronizás.</li>
+      <li><strong>Gmail (opcional):</strong> si conectás Gmail, leemos únicamente correos de pagos y recibos para importar transacciones, con permiso de solo lectura. Nunca leemos correos personales, adjuntos ni datos de contactos, ni enviamos correos en tu nombre.</li>
+      <li><strong>Mercado Pago (opcional):</strong> si conectás tu cuenta vía OAuth, accedemos a tus transacciones para clasificarlas. Guita Coach no puede mover, retirar ni transferir tu dinero.</li>
+      <li><strong>Sincronización bancaria — Prometeo / Plaid (opcional):</strong> si activás la sincronización con tu banco, tus credenciales se envían de forma cifrada directamente al proveedor de Open Banking correspondiente para obtener tus movimientos. No almacenamos tus credenciales bancarias en nuestros servidores.</li>
+      <li><strong>Resúmenes de inversión (opcional):</strong> si subís un archivo CSV o Excel de tu broker (por ejemplo Cocos Capital, Invertir Online o Bull Market) para hacer seguimiento de tu cartera, procesamos ese archivo para extraer tus operaciones. Guita Coach no abre cuentas ni opera en tu nombre en ningún broker.</li>
     </ul>
 
-    <h2>2. Cómo usamos tu información</h2>
+    <h2 id="uso">3. Cómo usamos tu información</h2>
     <ul>
-      <li>Proveerte el servicio de gestión financiera personal.</li>
-      <li>Clasificar y analizar tus transacciones automáticamente.</li>
-      <li>Generar alertas y reportes de gastos.</li>
-      <li>Mejorar el producto y corregir errores.</li>
+      <li>Proveerte el servicio de gestión y organización financiera personal.</li>
+      <li>Clasificar y analizar tus transacciones automáticamente mediante modelos de inteligencia artificial de terceros (Google Gemini y/o Anthropic Claude, según configuración).</li>
+      <li>Generar alertas, presupuestos por franjas y reportes de gastos.</li>
+      <li>Darte seguimiento de tus inversiones a partir de los resúmenes que subís.</li>
+      <li>Mejorar el producto, corregir errores y prevenir uso indebido.</li>
     </ul>
     <p>No vendemos, alquilamos ni compartimos tus datos con terceros con fines publicitarios.</p>
 
-    <h2>3. Uso de datos de Google</h2>
+    <h2 id="google">4. Uso de datos de Google</h2>
     <span class="badge">Google API</span>
-    <p>El acceso a Gmail se usa exclusivamente para importar transacciones de emails de pago (ej: recibos de Mercado Pago, Naranja X, servicios). El uso de la API de Google cumple con la <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank">Política de Datos de Usuario de Google API Services</a>, incluyendo los requisitos de Uso Limitado.</p>
+    <p>El acceso a Gmail se usa exclusivamente para importar transacciones de correos de pago (por ejemplo, recibos de Mercado Pago o de servicios). El uso de la API de Google cumple con la <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Política de Datos de Usuario de Google API Services</a>, incluyendo los requisitos de Uso Limitado (Limited Use).</p>
     <ul>
-      <li>Solo leemos emails que contengan información de pagos.</li>
-      <li>No accedemos a emails personales, adjuntos ni datos de contactos.</li>
-      <li>Los tokens de acceso se almacenan de forma segura y se pueden revocar en cualquier momento desde tu cuenta de Google.</li>
+      <li>El permiso solicitado es de solo lectura (<code>gmail.readonly</code>).</li>
+      <li>Solo procesamos correos que contengan información de pagos.</li>
+      <li>No accedemos a correos personales, adjuntos ni datos de contactos, y no usamos esta información para entrenar modelos de IA de uso general.</li>
+      <li>Los tokens de acceso se almacenan cifrados y se pueden revocar en cualquier momento desde tu cuenta de Google o desde Configuración en Guita Coach.</li>
     </ul>
 
-    <h2>4. Seguridad</h2>
+    <h2 id="seguridad">5. Seguridad</h2>
     <ul>
       <li>Todas las comunicaciones se realizan mediante HTTPS/TLS.</li>
-      <li>Las contraseñas se almacenan hasheadas con bcrypt.</li>
-      <li>Los tokens de acceso a servicios externos se guardan cifrados.</li>
-      <li>Los datos financieros se almacenan en servidores seguros (Railway/PostgreSQL).</li>
+      <li>Las contraseñas se almacenan con hash PBKDF2-SHA256 (200.000 iteraciones) y salt individual — nunca en texto plano.</li>
+      <li>Los tokens de acceso a servicios externos (Gmail, Mercado Pago, bancos) se guardan cifrados en reposo.</li>
+      <li>Los datos se almacenan en infraestructura cloud con base de datos PostgreSQL gestionada.</li>
     </ul>
 
-    <h2>5. Retención de datos</h2>
-    <p>Guardamos tus datos mientras tengas una cuenta activa. Al eliminar tu cuenta, todos tus datos personales y financieros son borrados permanentemente en un plazo de 30 días.</p>
+    <h2 id="internacional">6. Transferencia internacional de datos</h2>
+    <p>Algunos de nuestros proveedores (Google, Anthropic, y los proveedores de infraestructura cloud) procesan datos en servidores fuera de la Argentina. Tomamos recaudos contractuales para que el nivel de protección sea equivalente al exigido por la Ley 25.326, conforme a los estándares de la AAIP para transferencias internacionales.</p>
 
-    <h2>6. Tus derechos</h2>
+    <h2 id="retencion">7. Retención de datos</h2>
+    <p>Guardamos tus datos mientras tengas una cuenta activa. Al eliminar tu cuenta, todos tus datos personales y financieros son borrados permanentemente en un plazo de 30 días, salvo la información que debamos conservar por obligaciones legales, contables o impositivas.</p>
+
+    <h2 id="derechos">8. Tus derechos</h2>
     <ul>
-      <li>Acceder a todos tus datos en cualquier momento desde la app.</li>
-      <li>Exportar tus transacciones en CSV.</li>
-      <li>Eliminar tu cuenta y todos los datos asociados.</li>
-      <li>Revocar el acceso a Gmail o bancos desde Configuración.</li>
+      <li><strong>Acceso:</strong> ver todos tus datos en cualquier momento desde la app.</li>
+      <li><strong>Portabilidad:</strong> exportar tus transacciones en CSV.</li>
+      <li><strong>Rectificación:</strong> corregir datos inexactos.</li>
+      <li><strong>Supresión:</strong> eliminar tu cuenta y todos los datos asociados.</li>
+      <li><strong>Oposición:</strong> revocar el acceso a Gmail, Mercado Pago o bancos desde Configuración.</li>
     </ul>
+    <p>Podés ejercer estos derechos escribiéndonos a <a href="mailto:herniberelejis@gmail.com">herniberelejis@gmail.com</a>. También tenés derecho a reclamar ante la Agencia de Acceso a la Información Pública (AAIP), autoridad de control en materia de protección de datos personales en Argentina.</p>
 
-    <h2>7. Contacto</h2>
-    <p>Para cualquier consulta sobre privacidad, escribinos a: <a href="mailto:herniberelejis@gmail.com">herniberelejis@gmail.com</a></p>
+    <h2 id="contacto">9. Contacto</h2>
+    <p>BAK S.A.S. · CUIT 33-71678145-9 · Provincia de Córdoba, Argentina<br>Para cualquier consulta sobre privacidad, escribinos a: <a href="mailto:herniberelejis@gmail.com">herniberelejis@gmail.com</a></p>
 
-    <h2>8. Cambios en esta política</h2>
-    <p>Te notificaremos por email si hacemos cambios significativos. El uso continuado de la app implica la aceptación de los cambios.</p>
+    <h2 id="cambios">10. Cambios en esta política</h2>
+    <p>Te notificaremos por correo o dentro de la app si hacemos cambios significativos. El uso continuado de la app implica la aceptación de los cambios.</p>
+
+    <div class="notice">Ver también nuestros <a href="/terminos">Términos y Condiciones</a>.</div>
   </main>
 
   <footer>
