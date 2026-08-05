@@ -1,0 +1,218 @@
+// Guita Coach — esquema de base de datos (Prisma)
+// SQLite en desarrollo (archivo local), Postgres en producción vía DATABASE_URL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                Int       @id @default(autoincrement())
+  email             String?   @unique
+  passwordHash      String?
+  name              String    @default("Hernán")
+  monthlyIncome     Float     @default(0)
+  necesidadesPct    Float     @default(50)
+  gustosPct         Float     @default(30)
+  ahorroPct         Float     @default(20)
+  payday            Int       @default(1)
+  incomeIsVariable  Boolean   @default(false)
+  balance           Float     @default(0)
+  onboardingDone    Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+
+  connections           Connection[]
+  transactions          Transaction[]
+  goals                 Goal[]
+  recurringExpenses     RecurringExpense[]
+  sessions              UserSession[]
+  alerts                Alert[]
+  categoryRules         CategoryRule[]
+  investments           Investment[]
+  investmentTransactions InvestmentTransaction[]
+
+  @@map("users")
+}
+
+model Connection {
+  id           Int       @id @default(autoincrement())
+  userId       Int       @default(1) @map("user_id")
+  provider     String
+  status       String    @default("disconnected")
+  accessToken  String?
+  refreshToken String?
+  tokenExpiry  DateTime?
+  lastSync     DateTime?
+  syncStatus   String    @default("idle")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("connections")
+}
+
+model Transaction {
+  id                  Int      @id @default(autoincrement())
+  userId              Int      @default(1) @map("user_id")
+  source              String?
+  provider            String?
+  merchant            String?
+  amount              Float?
+  currency            String   @default("ARS")
+  date                String?
+  month               String?
+  category            String?
+  subcategory         String?
+  status              String   @default("new")
+  paymentMethod       String   @default("")
+  confidence          Float    @default(0)
+  ruleUsed            String?
+  aiReason            String?
+  rawReference        String?
+  needsReview         Boolean  @default(false)
+  txType              String   @default("expense")
+  isInternalTransfer  Boolean  @default(false)
+  isDuplicate         Boolean  @default(false)
+  isReimbursement     Boolean  @default(false)
+  reimbursesTxId      Int?
+  createdAt           DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("transactions")
+}
+
+model Goal {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
+  parentId     Int?
+  name         String
+  targetAmount Float    @default(0)
+  savedAmount  Float    @default(0)
+  currency     String   @default("ARS")
+  deadline     String?
+  isDone       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("goals")
+}
+
+model RecurringExpense {
+  id                 Int      @id @default(autoincrement())
+  userId             Int      @map("user_id")
+  merchant           String
+  amount             Float
+  category           String   @default("necesidades")
+  dayOfMonth         Int      @default(1)
+  installmentsTotal  Int      @default(0)
+  installmentsPaid   Int      @default(0)
+  active             Boolean  @default(true)
+  lastAppliedMonth   String?
+  createdAt          DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("recurring_expenses")
+}
+
+model UserSession {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  token     String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+model Alert {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @default(1) @map("user_id")
+  type      String
+  category  String?
+  message   String?
+  aiAdvice  String?
+  payload   String?
+  severity  String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("alerts")
+}
+
+model CategoryRule {
+  id              Int     @id @default(autoincrement())
+  userId          Int     @default(1) @map("user_id")
+  pattern         String
+  category        String?
+  subcategory     String?
+  priority        Int     @default(0)
+  fromCorrection  Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("category_rules")
+}
+
+model Investment {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @map("user_id")
+  broker        String
+  ticker        String
+  assetType     String   @default("stock")
+  currency      String   @default("ARS")
+  quantity      Float    @default(0)
+  avgCost       Float    @default(0)
+  purchaseDate  DateTime
+  status        String   @default("open")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions InvestmentTransaction[]
+
+  @@unique([userId, ticker, broker], name: "uq_user_ticker_broker")
+  @@map("investment")
+}
+
+model InvestmentTransaction {
+  id                   Int       @id @default(autoincrement())
+  investmentId         Int?
+  userId               Int       @map("user_id")
+  broker               String
+  ticker               String
+  assetType            String    @default("stock")
+  currency             String    @default("ARS")
+  txType               String
+  quantity             Float
+  price                Float
+  date                 DateTime
+  csvReference         String?
+  linkedTransactionId  Int?
+  createdAt            DateTime  @default(now())
+
+  investment Investment? @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("investment_transaction")
+}
+
+model InvestmentPrice {
+  id          Int      @id @default(autoincrement())
+  ticker      String   @unique
+  assetType   String   @default("stock")
+  price       Float
+  currency    String   @default("ARS")
+  lastUpdated DateTime @default(now()) @updatedAt
+
+  @@map("investment_price")
+}

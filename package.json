@@ -1,0 +1,27 @@
+{
+  "name": "guita-coach",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Guita Coach — asesor financiero personal para Argentina (Node.js + React, microservicios)",
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -n gateway,auth,tx,budget,inv,ai,client -c blue,green,yellow,magenta,cyan,red,white \"npm run dev -w @guita-coach/gateway\" \"npm run dev -w @guita-coach/auth-service\" \"npm run dev -w @guita-coach/transactions-service\" \"npm run dev -w @guita-coach/budget-service\" \"npm run dev -w @guita-coach/investments-service\" \"npm run dev -w @guita-coach/ai-service\" \"npm run dev -w @guita-coach/client\"",
+    "dev:services": "concurrently -n gateway,auth,tx,budget,inv,ai -c blue,green,yellow,magenta,cyan,red \"npm run dev -w @guita-coach/gateway\" \"npm run dev -w @guita-coach/auth-service\" \"npm run dev -w @guita-coach/transactions-service\" \"npm run dev -w @guita-coach/budget-service\" \"npm run dev -w @guita-coach/investments-service\" \"npm run dev -w @guita-coach/ai-service\"",
+    "dev:client": "npm run dev -w @guita-coach/client",
+    "build": "npm run build -w client",
+    "start": "concurrently -n gateway,auth,tx,budget,inv,ai -c blue,green,yellow,magenta,cyan,red \"npm run start -w @guita-coach/gateway\" \"npm run start -w @guita-coach/auth-service\" \"npm run start -w @guita-coach/transactions-service\" \"npm run start -w @guita-coach/budget-service\" \"npm run start -w @guita-coach/investments-service\" \"npm run start -w @guita-coach/ai-service\"",
+    "db:push": "prisma db push --schema packages/db/prisma/schema.prisma",
+    "db:generate": "prisma generate --schema packages/db/prisma/schema.prisma",
+    "db:seed": "node scripts/seed.js"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

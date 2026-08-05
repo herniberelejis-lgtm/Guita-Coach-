@@ -1,16 +1,39 @@
-FROM python:3.11-slim
+# Build de TODOS los microservicios + cliente en una sola imagen. Los 6
+# procesos (5 microservicios + gateway) corren dentro del mismo contenedor
+# vía scripts/start-all.js — pensado para plataformas de un solo contenedor
+# (Railway/Render). Para un despliegue real de microservicios (un contenedor
+# por servicio, escalables por separado) usar docker-compose.yml.
+FROM node:20-slim AS build
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+WORKDIR /repo
 
-WORKDIR /app
+COPY package.json package-lock.json ./
+COPY packages/db/package.json packages/db/package.json
+COPY packages/shared/package.json packages/shared/package.json
+COPY services/gateway/package.json services/gateway/package.json
+COPY services/auth-service/package.json services/auth-service/package.json
+COPY services/transactions-service/package.json services/transactions-service/package.json
+COPY services/budget-service/package.json services/budget-service/package.json
+COPY services/investments-service/package.json services/investments-service/package.json
+COPY services/ai-service/package.json services/ai-service/package.json
+COPY client/package.json client/package.json
+RUN npm ci
 
-# Install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+RUN npx prisma generate --schema packages/db/prisma/schema.prisma
+RUN npm run build -w client
 
-# Copy application (v2 - force rebuild)
-COPY app/ app/
-COPY static/ static/
-# Nunca copiar .env: en prod las variables las inyecta la plataforma (Railway/etc);
-# copiar archivos .env locales hornearía secretos en las capas de la imagen.
+FROM node:20-slim AS runtime
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+WORKDIR /repo
+ENV NODE_ENV=production
 
-# Run
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+COPY --from=build /repo/package.json ./
+COPY --from=build /repo/node_modules node_modules
+COPY --from=build /repo/packages packages
+COPY --from=build /repo/services services
+COPY --from=build /repo/client/dist client/dist
+COPY --from=build /repo/scripts/start-all.js scripts/start-all.js
+
+EXPOSE 8000
+CMD ["node", "scripts/start-all.js"]

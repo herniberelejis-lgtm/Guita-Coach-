@@ -1,0 +1,111 @@
+# Despliegue de microservicios "real": un contenedor por servicio, cada uno
+# escalable/desplegable de forma independiente. Comparten una única base
+# SQLite en un volumen (alcanza para self-hosting/demo; para producción con
+# alta concurrencia cambiar DATABASE_URL a Postgres y el provider en
+# packages/db/prisma/schema.prisma).
+#
+# Uso:
+#   cp .env.example .env   # completar SECRET_KEY, API keys, etc.
+#   docker compose up --build
+
+services:
+  migrate:
+    build:
+      context: .
+      dockerfile: packages/db/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: file:./dev.db
+    volumes:
+      - dbdata:/repo/packages/db/prisma
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth-service/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: file:./dev.db
+    volumes:
+      - dbdata:/repo/packages/db/prisma
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  transactions-service:
+    build:
+      context: .
+      dockerfile: services/transactions-service/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: file:./dev.db
+    volumes:
+      - dbdata:/repo/packages/db/prisma
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  budget-service:
+    build:
+      context: .
+      dockerfile: services/budget-service/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: file:./dev.db
+    volumes:
+      - dbdata:/repo/packages/db/prisma
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  investments-service:
+    build:
+      context: .
+      dockerfile: services/investments-service/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: file:./dev.db
+    volumes:
+      - dbdata:/repo/packages/db/prisma
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: services/ai-service/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: file:./dev.db
+    volumes:
+      - dbdata:/repo/packages/db/prisma
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: file:./dev.db
+      AUTH_SERVICE_URL: http://auth-service:4001
+      TRANSACTIONS_SERVICE_URL: http://transactions-service:4002
+      BUDGET_SERVICE_URL: http://budget-service:4003
+      INVESTMENTS_SERVICE_URL: http://investments-service:4004
+      AI_SERVICE_URL: http://ai-service:4005
+    volumes:
+      - dbdata:/repo/packages/db/prisma
+    ports:
+      - "8000:8000"
+    depends_on:
+      - auth-service
+      - transactions-service
+      - budget-service
+      - investments-service
+      - ai-service
+
+volumes:
+  dbdata:

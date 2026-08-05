@@ -1,1 +1,1 @@
-web: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+web: npx prisma db push --schema packages/db/prisma/schema.prisma --accept-data-loss --skip-generate && node scripts/start-all.js

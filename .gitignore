@@ -12,28 +12,25 @@ google_credentials.json
 token.json
 *_token.json
 
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-.pytest_cache/
-.venv/
-venv/
-env/
-*.egg-info/
+# Node
+node_modules/
 dist/
 build/
+*.log
+npm-debug.log*
+.npm
+
+# Prisma
+packages/db/prisma/dev.db
+packages/db/prisma/dev.db-journal
 
 # IDE
 .vscode/
 .idea/
 *.swp
-guita-coach/
 .remember/
 tok.tmp
 
 # Windows
 desktop.ini
 Thumbs.db
-htmlcov/
-.coverage
