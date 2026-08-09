@@ -24,10 +24,10 @@
         still: 'assets/img/beat-local.webp',
         clip: 'assets/vid/local.mp4', clipMobile: 'assets/vid/local-m.mp4',
         scroll: 1.7, linger: 0.35,
-        eyebrow: 'Un martes cualquiera',
+        eyebrow: 'El problema',
         title: 'Tu mejor mesa no deja rastro.',
-        body: 'La atendieron bien, comieron bien, se van contentos. Y mañana nadie en Google va a enterarse. Tus clientes felices casi nunca dejan reseña: no porque no quieran, sino porque nadie se las pidió en el momento justo.',
-        tags: ['Sin fricción', 'Sin apps'],
+        body: 'Comieron bien, los atendieron bien, se van. Mañana en Google no va a figurar nada. No es que no quieran dejar reseña: es que hay que acordarse, buscar el local y escribir, y eso pasa en el estacionamiento o nunca.',
+        tags: ['El pedido llega tarde o no llega'],
       },
       {
         id: 'gesto', label: 'El gesto', accent: '#10B981',
@@ -176,11 +176,14 @@
         || window.matchMedia('(max-width: 860px)').matches;
   };
 
-  var demos = $$('[data-demo-media]').map(function (media) {
+  var demos = $$('[data-demo]').map(function (block) {
+    var media = $('[data-demo-media]', block);
     return {
+      block: block,
       media: media,
       video: $('video', media),
       bar: $('.demo-scrub span', media),
+      points: $$('.demo-copy li', block),
       loading: false, ready: false, cur: 0, target: 0,
     };
   });
@@ -189,10 +192,14 @@
     if (reduce || d.loading) return;
     d.loading = true;
     var url = (isMobile() && d.video.getAttribute('data-src-mobile')) || d.video.getAttribute('data-src');
-    fetch(url)
-      .then(function (r) { return r.ok ? r.blob() : Promise.reject(new Error(String(r.status))); })
-      .then(function (blob) {
-        d.video.src = URL.createObjectURL(blob);
+    var source = url.indexOf('data:') === 0
+      ? Promise.resolve(url)
+      : fetch(url)
+          .then(function (r) { return r.ok ? r.blob() : Promise.reject(new Error(String(r.status))); })
+          .then(function (blob) { return URL.createObjectURL(blob); });
+    source
+      .then(function (src) {
+        d.video.src = src;
         d.video.addEventListener('loadedmetadata', function () { d.ready = true; });
         d.video.addEventListener('seeked', function () { d.media.classList.add('has-clip'); }, { once: true });
       })
@@ -200,13 +207,21 @@
   }
 
   function readDemos() {
+    var vh = window.innerHeight || 1;
     demos.forEach(function (d) {
-      var r = d.media.getBoundingClientRect();
-      var vh = window.innerHeight || 1;
+      var r = d.block.getBoundingClientRect();
       if (r.top < vh * 2 && r.bottom > -vh) loadDemo(d);
-      // La fracción va de "el bloque entra por abajo" a "sale por arriba".
-      d.target = clamp((vh - r.top) / (r.height + vh), 0, 1);
+      // Con el video pinneado, el progreso es cuánto del bloque ya pasó por
+      // arriba: 0 cuando el bloque toca el borde superior, 1 cuando termina.
+      var span = Math.max(1, r.height - vh);
+      d.target = clamp(-r.top / span, 0, 1);
       if (d.bar) d.bar.style.transform = 'scaleX(' + d.target.toFixed(3) + ')';
+      // Repartidos parejo en el primer 72% del recorrido: el primero ya está
+      // encendido cuando el bloque se fija, el último bastante antes del final.
+      var n = Math.max(1, d.points.length - 1);
+      d.points.forEach(function (li, i) {
+        li.classList.toggle('on', d.target >= (i / n) * 0.72);
+      });
     });
   }
 
@@ -240,60 +255,55 @@
     }, { once: true, passive: true });
   }
 
-  /* ══════════ capturas del panel ══════════ */
-  var shotsNav = $('#shots-nav');
-  if (shotsNav) {
-    shotsNav.addEventListener('click', function (ev) {
-      var btn = ev.target.closest('button');
-      if (!btn) return;
-      var shot = btn.getAttribute('data-shot');
-      $$('button', shotsNav).forEach(function (b) {
-        var on = b === btn;
-        b.classList.toggle('is-active', on);
-        b.setAttribute('aria-selected', String(on));
+  /* ══════════ la cadena del tap ══════════
+     La línea se dibuja según cuánto de la lista pasó por el centro de la
+     pantalla, y cada paso se enciende cuando le toca. El progreso es continuo
+     (la línea) y discreto (los pasos) a la vez, así el recorrido se lee
+     mientras se scrollea y no solo al final. */
+  var chain = $('#chain');
+  if (chain) {
+    var steps = $$('.step-c', chain);
+    var readChain = function () {
+      var r = chain.getBoundingClientRect();
+      var mark = window.innerHeight * 0.62;          // la línea sigue este punto
+      var p = clamp((mark - r.top) / r.height, 0, 1);
+      chain.style.setProperty('--chain-p', p.toFixed(4));
+      steps.forEach(function (st) {
+        st.classList.toggle('on', st.getBoundingClientRect().top < mark);
       });
-      $$('#shots-stage img').forEach(function (img) {
-        img.classList.toggle('is-active', img.getAttribute('data-shot') === shot);
-      });
-    });
-  }
-
-  /* ══════════ ranking de personal ══════════ */
-  var STAFF = [
-    { name: 'Mostrador', taps: 526 }, { name: 'Nicolás Ferreyra', taps: 346 },
-    { name: 'Camila Suárez', taps: 281 }, { name: 'Bruno Aguirre', taps: 196 },
-    { name: 'Valentina Rossi', taps: 136 }, { name: 'Tomás Ledesma', taps: 81 },
-  ];
-  var rank = $('#rank');
-  if (rank) {
-    var max = Math.max.apply(null, STAFF.map(function (s) { return s.taps; }));
-    rank.innerHTML = STAFF.map(function (s) {
-      return '<div class="rank">' +
-        '<span class="avatar">' + s.name.charAt(0) + '</span>' +
-        '<div class="rank-body">' +
-          '<div class="rank-top"><span>' + s.name + '</span><b>' + s.taps.toLocaleString('es-AR') + '</b></div>' +
-          '<div class="meter"><i data-w="' + Math.round((s.taps / max) * 100) + '"></i></div>' +
-        '</div></div>';
-    }).join('');
-    // Las barras crecen recién cuando la tarjeta entra en pantalla.
-    var fill = function () { $$('#rank .meter i').forEach(function (i) { i.style.width = i.getAttribute('data-w') + '%'; }); };
-    if ('IntersectionObserver' in window) {
-      var ro = new IntersectionObserver(function (es) {
-        if (es[0].isIntersecting) { fill(); ro.disconnect(); }
-      }, { threshold: 0.3 });
-      ro.observe(rank);
-    } else { fill(); }
+    };
+    var chainTick = false;
+    window.addEventListener('scroll', function () {
+      if (!chainTick) { chainTick = true; requestAnimationFrame(function () { readChain(); chainTick = false; }); }
+    }, { passive: true });
+    window.addEventListener('resize', readChain);
+    readChain();
   }
 
   /* ══════════ simulador ROI ══════════
-     Misma fórmula que el prototipo de diseño: taps y reseñas salen de las tasas
-     del rubro, y los clientes nuevos son un 15–35% de la base mensual. */
+     La cadena tiene tres eslabones y cada uno se calcula sobre el anterior:
+
+       taps    = clientes × tasa de tap del rubro
+       reseñas = taps × tasa de publicación   (no todo el que toca termina escribiendo)
+       nuevos  = clientes × LIFT
+
+     El prototipo original calculaba las reseñas sobre los clientes en vez de
+     sobre los taps, así que daba ~48 reseñas para 56 taps: un 86% de los que
+     tocan el cartel dejarían reseña. Acá las reseñas cuelgan de los taps, que
+     es el orden real de los hechos.
+
+     LIFT (3–7%) es el único número que no se mide con el producto, así que se
+     ancla a algo verificable: la ficha del cliente de referencia muestra +0,7★
+     desde la instalación, y la literatura sobre reseñas y facturación ubica el
+     impacto en torno al 5–9% por estrella. 0,7★ sobre ese rango da 3,5–6,3%;
+     el 3–7% es esa banda, redondeada y algo conservadora del lado de abajo. */
+  var LIFT_MIN = 0.03, LIFT_MAX = 0.07;
   var elClients = $('#roi-clients');
   var elTicket = $('#roi-ticket');
   if (elClients && elTicket) {
     var outClients = $('#out-clients'), outTicket = $('#out-ticket');
     var rReviews = $('#r-reviews'), rTaps = $('#r-taps'), rNew = $('#r-new'), rRev = $('#r-rev');
-    var industry = { tap: 0.07, conv: 0.06 };
+    var industry = { tap: 0.07, pub: 0.28 };
     var ar = function (n) { return Math.round(n).toLocaleString('es-AR'); };
 
     function computeRoi() {
@@ -301,9 +311,12 @@
       var ticket = Number(elTicket.value);
       outClients.textContent = ar(clients);
       outTicket.textContent = '$' + ar(ticket);
-      rTaps.textContent = '~' + ar(clients * industry.tap);
-      rReviews.textContent = '~' + ar(clients * industry.conv);
-      var min = Math.round(clients * 0.15), max2 = Math.round(clients * 0.35);
+
+      var taps = clients * industry.tap;
+      rTaps.textContent = '~' + ar(taps);
+      rReviews.textContent = '~' + ar(taps * industry.pub);
+
+      var min = Math.round(clients * LIFT_MIN), max2 = Math.round(clients * LIFT_MAX);
       rNew.textContent = '+' + ar(min) + ' – ' + ar(max2);
       rRev.textContent = '$' + ar(min * ticket) + ' – $' + ar(max2 * ticket);
     }
@@ -313,7 +326,7 @@
     $$('#roi-industries .chip').forEach(function (chip) {
       chip.addEventListener('click', function () {
         $$('#roi-industries .chip').forEach(function (c) { c.classList.toggle('is-active', c === chip); });
-        industry = { tap: Number(chip.getAttribute('data-tap')), conv: Number(chip.getAttribute('data-conv')) };
+        industry = { tap: Number(chip.getAttribute('data-tap')), pub: Number(chip.getAttribute('data-pub')) };
         computeRoi();
       });
     });
@@ -322,6 +335,15 @@
 
   /* ══════════ varios ══════════ */
   $('#year').textContent = String(new Date().getFullYear());
+
+  // Las fotos de producto se sirven desde Vercel Blob. Si el host no responde,
+  // se cae a un frame del video de demo que está en el repo.
+  $$('img[data-fallback]').forEach(function (img) {
+    img.addEventListener('error', function once() {
+      img.removeEventListener('error', once);
+      img.src = img.getAttribute('data-fallback');
+    });
+  });
 
   // El scroll suave nativo pasa por debajo de la navbar fija: se compensa.
   $$('a[href^="#"]').forEach(function (a) {

@@ -14,12 +14,14 @@ B=https://hebbkx1anhila5yf.public.blob.vercel-storage.com
 mkdir -p "$IMG"
 
 # nombre_local|url
+# Prefijo blob- a propósito: hw-standee.webp y hw-tarjeta.webp ya existen y son
+# los frames de los videos de demo que actúan como fallback. No se pisan.
 FILES="
-logo-dark.png|$B/MetFi-Logo-FondoNegro-VXninT2kgNlqkeXES1iroVUxvUhSVp.png
-logo-light.png|$B/MetFi-Logo-FondoBlanco-XWd9MHo0CD83dVEdIyPqq02CVIwqLd.png
-hw-standee.png|$B/Gemini_Generated_Image_d65d70d65d70d65d-Zp3KAm3pKXnfc1r1vchpCNeb8En0Qz.png
-hw-tarjeta.png|$B/Gemini_Generated_Image_c44kvoc44kvoc44k-jXqjmTG3Gy6FnLoZLs2tP2yj88yOO5.png
-hw-sticker.png|$B/Sticker%20NFC-ukzsfesKOp3vKLxWDaUK4cmVYbkGbt.png
+blob-logo-dark.png|$B/MetFi-Logo-FondoNegro-VXninT2kgNlqkeXES1iroVUxvUhSVp.png
+blob-logo-light.png|$B/MetFi-Logo-FondoBlanco-XWd9MHo0CD83dVEdIyPqq02CVIwqLd.png
+blob-hw-standee.png|$B/Gemini_Generated_Image_d65d70d65d70d65d-Zp3KAm3pKXnfc1r1vchpCNeb8En0Qz.png
+blob-hw-tarjeta.png|$B/Gemini_Generated_Image_c44kvoc44kvoc44k-jXqjmTG3Gy6FnLoZLs2tP2yj88yOO5.png
+blob-hw-sticker.png|$B/Sticker%20NFC-ukzsfesKOp3vKLxWDaUK4cmVYbkGbt.png
 "
 
 for row in $FILES; do

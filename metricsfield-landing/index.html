@@ -11,9 +11,7 @@
 <meta property="og:description" content="Equipamos tu mostrador con hardware NFC/QR. Tus clientes acercan el celular y van directo a calificar en Google.">
 <meta property="og:locale" content="es_AR">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2309090B'/%3E%3Cpath d='M8 23V9h3.4l4.6 8 4.6-8H24v14h-3.1v-8.6L16.6 22h-1.2l-4.3-7.6V23z' fill='%2310B981'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="preload" href="assets/fonts/montserrat-700-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/styles.css">
 </head>
 <body>
@@ -51,9 +49,9 @@
     <nav class="nav-links" id="nav-links" aria-label="Secciones">
       <a href="#hardware">Hardware</a>
       <a href="#uso">Así se usa</a>
-      <a href="#panel">El Panel</a>
-      <a href="#como-funciona">Cómo funciona</a>
-      <a href="#roi">Simulador ROI</a>
+      <a href="#mecanismo">El mecanismo</a>
+      <a href="#panel">El panel</a>
+      <a href="#roi">Simulador</a>
       <a href="#planes">Planes</a>
     </nav>
     <a class="nav-cta" href="https://wa.me/5493513480773?text=Hola!%20Quiero%20una%20demo%20de%20MetricsField" target="_blank" rel="noopener noreferrer">Solicitar Demo →</a>
@@ -66,9 +64,9 @@
 <nav class="drawer" id="drawer" aria-label="Menú">
   <a href="#hardware">Hardware</a>
   <a href="#uso">Así se usa</a>
-  <a href="#panel">El Panel</a>
-  <a href="#como-funciona">Cómo funciona</a>
-  <a href="#roi">Simulador ROI</a>
+  <a href="#mecanismo">El mecanismo</a>
+  <a href="#panel">El panel</a>
+  <a href="#roi">Simulador</a>
   <a href="#planes">Planes</a>
   <div class="drawer-cta">
     <a href="https://wa.me/5493513480773?text=Hola!%20Quiero%20una%20demo%20de%20MetricsField" target="_blank" rel="noopener noreferrer">Solicitar Demo →</a>
@@ -85,35 +83,34 @@
 <!-- ══════════ ACTO 2 · la landing de venta ══════════ -->
 <main id="sales">
 
-  <!-- INTRO -->
+  <!-- QUÉ ES -->
   <section class="section" id="intro">
     <div class="wrap">
-      <div class="intro-grid">
-        <div class="reveal">
-          <p class="eyebrow">Hardware NFC/QR + panel</p>
-          <h2 class="h">La reputación de tu local,<br>trabajando sola.</h2>
-          <p class="lede">Equipamos tu mostrador y tus mesas con hardware NFC/QR. Tus clientes acercan el celular y van directo a calificar en Google. Sin fricción, sin apps, 100% dentro de las políticas de Google.</p>
-          <div class="intro-ctas">
-            <a class="btn btn-primary" href="https://wa.me/5493513480773?text=Hola!%20Quiero%20una%20demo%20presencial%20gratis%20de%20MetricsField" target="_blank" rel="noopener noreferrer">Pedir demo presencial gratis <span class="arrow">→</span></a>
-            <a class="btn btn-ghost" href="#panel">Ver el panel</a>
-          </div>
-          <div class="badges">
-            <div class="badge"><i><svg width="12" height="12"><use href="#i-shield"/></svg></i><span>100% seguro para Google Maps</span></div>
-            <div class="badge"><i><svg width="12" height="12"><use href="#i-zap"/></svg></i><span>Sin descargar apps</span></div>
-            <div class="badge"><i><svg width="12" height="12"><use href="#i-clock"/></svg></i><span>Instalación en 24 hs</span></div>
-            <div class="badge"><i><svg width="12" height="12"><use href="#i-chart"/></svg></i><span>Panel de control en vivo</span></div>
-          </div>
-        </div>
-        <div class="reveal" data-d="1">
-          <div class="proof">
-            <p class="proof-t">Un local real · este mes</p>
-            <div class="proof-row"><span>Reseñas nuevas</span><b style="color:var(--green-d)" data-count="38" data-prefix="+">+38</b></div>
-            <div class="proof-row"><span>Taps del cartel</span><b data-count="1566">1.566</b></div>
-            <div class="proof-row"><span>Rating en Google</span><b>4.8 ★</b></div>
-            <div class="proof-row"><span>Reseñas totales</span><b data-count="140">140</b></div>
-            <p class="proof-foot">+0.7★ desde que instalaron MetricsField</p>
-          </div>
-        </div>
+      <div class="head reveal">
+        <p class="eyebrow">Qué es</p>
+        <h2 class="h">Tres cosas, sin vueltas</h2>
+        <p class="lede">Un producto físico, un software que lo mide y gente que lo instala. Nada de esto es una app que tus clientes tengan que bajar.</p>
+      </div>
+
+      <div class="tri">
+        <article class="tri-c reveal">
+          <span class="tri-n">Hardware</span>
+          <h3>Piezas con chip NFC y QR</h3>
+          <p>Standee para el mostrador, tarjetas para el personal, stickers para las mesas. Sin batería, sin mantenimiento. Cada pieza lleva un código único grabado (<code>p-0001-a3f9c2</code>) que es lo que después permite saber cuál se tocó.</p>
+          <a class="tri-a" href="#hardware">Ver las piezas y precios →</a>
+        </article>
+        <article class="tri-c reveal" data-d="1">
+          <span class="tri-n">Software</span>
+          <h3>Un portal privado por cliente</h3>
+          <p>Taps por día, hora y pieza; reseñas nuevas con borrador de respuesta; rating contra el mes anterior; tus competidores de la zona. Se entra por un link, sin usuario ni contraseña.</p>
+          <a class="tri-a" href="#panel">Probar el panel acá abajo →</a>
+        </article>
+        <article class="tri-c reveal" data-d="2">
+          <span class="tri-n">Servicio</span>
+          <h3>Instalación y soporte en Córdoba</h3>
+          <p>Vinculamos tu ficha de Google, generamos los códigos y llevamos las piezas al local. La configuración la hacemos nosotros; vos apoyás el cartel en el mostrador.</p>
+          <a class="tri-a" href="#como-funciona">Cómo es la puesta en marcha →</a>
+        </article>
       </div>
 
       <div class="statgrid reveal">
@@ -142,7 +139,7 @@
 
       <div class="hw-panel is-active" id="hw-standee" role="tabpanel" aria-labelledby="tab-standee">
         <div class="hw-media">
-          <img src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Gemini_Generated_Image_d65d70d65d70d65d-Zp3KAm3pKXnfc1r1vchpCNeb8En0Qz.png" alt="Standee de acrílico MetricsField sobre el mostrador de un local" loading="lazy">
+          <img src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Gemini_Generated_Image_d65d70d65d70d65d-Zp3KAm3pKXnfc1r1vchpCNeb8En0Qz.png" alt="Standee de acrílico MetricsField sobre el mostrador de un local" loading="lazy" data-fallback="assets/img/hw-standee.webp">
           <span class="hw-tag">Más popular</span>
         </div>
         <div>
@@ -162,7 +159,7 @@
 
       <div class="hw-panel" id="hw-tarjeta" role="tabpanel" aria-labelledby="tab-tarjeta" hidden>
         <div class="hw-media">
-          <img src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Gemini_Generated_Image_c44kvoc44kvoc44k-jXqjmTG3Gy6FnLoZLs2tP2yj88yOO5.png" alt="Mozo presentando una tarjeta NFC MetricsField a un cliente" loading="lazy">
+          <img src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Gemini_Generated_Image_c44kvoc44kvoc44k-jXqjmTG3Gy6FnLoZLs2tP2yj88yOO5.png" alt="Mozo presentando una tarjeta NFC MetricsField a un cliente" loading="lazy" data-fallback="assets/img/hw-tarjeta.webp">
           <span class="hw-tag">Para personal</span>
         </div>
         <div>
@@ -207,120 +204,119 @@
     <div class="wrap mid">
       <div class="head reveal">
         <p class="eyebrow">Así se usa</p>
-        <h2 class="h">En el día a día del local</h2>
-        <p class="lede">Scrolleá: el video avanza con vos, cuadro por cuadro.</p>
+        <h2 class="h">Dos piezas, dos momentos distintos</h2>
+        <p class="lede">Los videos avanzan con tu scroll, cuadro por cuadro. Es material del local de un cliente, no un render.</p>
       </div>
 
-      <div class="demo reveal" data-demo>
+      <div class="demo" data-demo>
         <div class="demo-media" data-demo-media>
           <img src="assets/img/demo-standee.webp" alt="" loading="lazy">
           <video data-src="assets/vid/demo-standee.mp4" data-src-mobile="assets/vid/demo-standee-m.mp4" muted playsinline preload="none" aria-label="El standee en el mostrador de un local"></video>
           <div class="demo-scrub"><span></span></div>
         </div>
-        <div>
-          <p class="demo-tag">Mostrador</p>
-          <h3>El standee en el mostrador</h3>
+        <div class="demo-copy">
+          <p class="demo-tag">Standee · mostrador</p>
+          <h3>Queda fijo y trabaja con todo el flujo</h3>
           <ul>
-            <li><svg width="14" height="14"><use href="#i-check"/></svg>El cliente acerca el celular al salir o al pagar.</li>
-            <li><svg width="14" height="14"><use href="#i-check"/></svg>Tap directo, sin apps ni fricción.</li>
-            <li><svg width="14" height="14"><use href="#i-check"/></svg>Queda fijo: capta a todo el flujo del local.</li>
+            <li><span class="bp"></span><b>Va donde el cliente ya se detiene.</b> Al lado de la caja o del posnet, en el momento en que está esperando el ticket.</li>
+            <li><span class="bp"></span><b>No hay que pedirle nada.</b> El acrílico dice qué hacer; el cliente acerca el teléfono y listo.</li>
+            <li><span class="bp"></span><b>Los taps quedan bajo «Mostrador».</b> Es la pieza que más volumen hace: en la cuenta demo, 526 de los 1.576 taps del mes.</li>
           </ul>
         </div>
       </div>
 
-      <div class="demo flip reveal" data-demo>
+      <div class="demo flip" data-demo>
         <div class="demo-media" data-demo-media>
           <img src="assets/img/demo-tarjeta.webp" alt="" loading="lazy">
           <video data-src="assets/vid/demo-tarjeta.mp4" data-src-mobile="assets/vid/demo-tarjeta-m.mp4" muted playsinline preload="none" aria-label="Un mozo presentando la tarjeta NFC al cliente"></video>
           <div class="demo-scrub"><span></span></div>
         </div>
-        <div>
-          <p class="demo-tag">Personal</p>
-          <h3>La tarjeta del mozo</h3>
+        <div class="demo-copy">
+          <p class="demo-tag">Tarjeta · personal</p>
+          <h3>Una por empleado, y ahí aparece el dato que falta</h3>
           <ul>
-            <li><svg width="14" height="14"><use href="#i-check"/></svg>Se la presenta al cliente al cierre de la mesa.</li>
-            <li><svg width="14" height="14"><use href="#i-check"/></svg>Va en el bolsillo, lista en cualquier momento.</li>
-            <li><svg width="14" height="14"><use href="#i-check"/></svg>Permite medir qué colaborador genera más reseñas.</li>
+            <li><span class="bp"></span><b>Sale del bolsillo al cerrar la mesa.</b> Justo cuando el cliente está conforme, que es cuando la reseña sale bien.</li>
+            <li><span class="bp"></span><b>Cada tarjeta tiene su propio código.</b> Por eso el panel puede decir que Nicolás hizo 346 taps y Camila 281.</li>
+            <li><span class="bp"></span><b>Sirve para algo más que medir.</b> Un ranking visible en el grupo del personal mueve más la aguja que cualquier recordatorio.</li>
           </ul>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- PANEL -->
+  <!-- QUÉ PASA EN UN TAP -->
+  <section class="section" id="mecanismo">
+    <div class="wrap mid">
+      <div class="head reveal">
+        <p class="eyebrow">El mecanismo</p>
+        <h2 class="h">Qué pasa, exactamente, cuando alguien toca el cartel</h2>
+        <p class="lede">Seis pasos, alrededor de un segundo. Vale entenderlo porque explica por qué se puede medir y por qué el link se cambia sin reimprimir.</p>
+      </div>
+
+      <ol class="chain" id="chain">
+        <li class="step-c">
+          <span class="step-d">1</span>
+          <h3>El cliente acerca el celular</h3>
+          <p>El chip NFC NTAG215 no necesita batería: se alimenta del campo del teléfono. Si el celular no lee NFC, el QR impreso hace exactamente lo mismo.</p>
+          <span class="step-m">NFC NTAG215 · QR de respaldo</span>
+        </li>
+        <li class="step-c">
+          <span class="step-d">2</span>
+          <h3>Se abre un link corto, no una app</h3>
+          <p>El chip guarda una URL. El teléfono la abre en el navegador que ya tiene. No hay nada que descargar ni permisos que aceptar.</p>
+          <span class="step-m">Sin app · sin instalación</span>
+        </li>
+        <li class="step-c">
+          <span class="step-d">3</span>
+          <h3>Ese link pega en nuestro servidor</h3>
+          <p>Todavía no en Google. Ese rodeo de milisegundos es lo que hace posible todo lo demás: medir, y cambiar el destino después.</p>
+          <span class="step-m">Redirección dinámica</span>
+        </li>
+        <li class="step-c">
+          <span class="step-d">4</span>
+          <h3>Se registra el evento</h3>
+          <p>Qué pieza se tocó, en qué sucursal, de qué colaborador era la tarjeta, a qué hora y si entró por NFC o por QR. Nada del cliente: no hay dato personal en juego.</p>
+          <span class="step-m">Pieza · sucursal · empleado · hora</span>
+        </li>
+        <li class="step-c">
+          <span class="step-d">5</span>
+          <h3>Redirect a tu ficha de Google</h3>
+          <p>El cliente aterriza directo en el formulario de reseña de tu local. Desde que apoyó el teléfono pasó alrededor de un segundo.</p>
+          <span class="step-m">~1 segundo de punta a punta</span>
+        </li>
+        <li class="step-c">
+          <span class="step-d">6</span>
+          <h3>Aparece en el panel</h3>
+          <p>El tap se ve en Escaneos al instante. La reseña aparece cuando Google la publica, junto con un borrador de respuesta ya escrito.</p>
+          <span class="step-m">Tap: instantáneo · reseña: al publicarse</span>
+        </li>
+      </ol>
+
+      <div class="chain-note reveal">
+        <p><b>Por qué importa el paso 3.</b> Como el hardware apunta a nuestro servidor y no a Google, el destino es una configuración, no una impresión. Si mudás el local, si Google cambia el formato de sus links, o si querés mandar los taps a una encuesta en vez de a la ficha, se cambia en el panel y las piezas que ya están pegadas siguen funcionando.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- EL PANEL -->
   <section class="section" id="panel">
     <div class="wrap">
       <div class="head reveal">
-        <p class="eyebrow">El panel</p>
-        <h2 class="h">Mucho más que un cartel.<br>Un panel de control.</h2>
-        <p class="lede">Capturas reales del producto. Medí cada interacción, analizá tendencias y posicioná tu local sobre la competencia.</p>
+        <p class="eyebrow">El software</p>
+        <h2 class="h">Este es el panel. Tocalo.</h2>
+        <p class="lede">Es el portal real de una cuenta demo, funcionando acá adentro. Movete por el menú: cada sección es una pantalla que vas a tener.</p>
       </div>
 
       <div class="browser reveal">
         <div class="browser-bar">
           <div class="dots"><i></i><i></i><i></i></div>
-          <div class="browser-url">portal.metricsfield.com</div>
-          <span class="browser-live"><i></i>en vivo</span>
+          <div class="browser-url">app.metricsfield.com/portal/demo2026</div>
+          <span class="browser-live"><i></i>demo</span>
         </div>
-        <div class="browser-body">
-          <div class="shots-nav" id="shots-nav" role="tablist" aria-label="Vistas del panel">
-            <button class="is-active" role="tab" aria-selected="true" data-shot="resumen">Resumen</button>
-            <button role="tab" aria-selected="false" data-shot="taps">Taps por día</button>
-            <button role="tab" aria-selected="false" data-shot="resenas">Reseñas <span class="pill">3</span></button>
-            <button role="tab" aria-selected="false" data-shot="dispositivos">Mis dispositivos</button>
-            <button role="tab" aria-selected="false" data-shot="escaneos">Escaneos</button>
-            <button role="tab" aria-selected="false" data-shot="mes">Resumen del mes</button>
-          </div>
-          <div class="shots-stage" id="shots-stage">
-            <img class="is-active" src="assets/img/panel-resumen.webp" alt="Vista Resumen del panel de MetricsField" data-shot="resumen">
-            <img src="assets/img/panel-taps.webp" alt="Gráfico de taps por día" data-shot="taps" loading="lazy">
-            <img src="assets/img/panel-resenas.webp" alt="Listado de reseñas de Google" data-shot="resenas" loading="lazy">
-            <img src="assets/img/panel-dispositivos.webp" alt="Listado de dispositivos NFC instalados" data-shot="dispositivos" loading="lazy">
-            <img src="assets/img/panel-escaneos.webp" alt="Detalle de escaneos" data-shot="escaneos" loading="lazy">
-            <img src="assets/img/panel-mes.webp" alt="Resumen mensual" data-shot="mes" loading="lazy">
-          </div>
-        </div>
+        <div id="portal"></div>
       </div>
 
-      <div class="feat3">
-        <div class="fcard reveal">
-          <h4>Alertas que te buscan</h4>
-          <p>No hace falta que entres a mirar: el panel te avisa.</p>
-          <div class="alert warn"><svg width="14" height="14" style="color:#F59E0B;flex-shrink:0;margin-top:2px"><use href="#i-bell"/></svg><div>3 reseñas esperando tu respuesta sugerida por IA<time>Hace 2 hs</time></div></div>
-          <div class="alert info"><svg width="14" height="14" style="color:#3B82F6;flex-shrink:0;margin-top:2px"><use href="#i-message"/></svg><div>Conectá tu Google Business Profile para automatizar visitas<time>Hoy</time></div></div>
-          <div class="alert ok"><svg width="14" height="14" style="color:#10B981;flex-shrink:0;margin-top:2px"><use href="#i-trending"/></svg><div>+7 reseñas nuevas esta semana en Nueva Córdoba<time>Esta semana</time></div></div>
-        </div>
-
-        <div class="fcard reveal" data-d="1">
-          <h4>Respuestas sugeridas</h4>
-          <p>Cada reseña llega con un borrador listo para publicar.</p>
-          <div class="review">
-            <div class="review-h">
-              <div class="review-who"><span class="avatar">F</span>Facundo Ríos<span class="stars">★★★★★</span></div>
-              <span style="font-size:.7rem;color:var(--g400)">Hace 1 día</span>
-            </div>
-            <p>"El mejor asado de la zona, sin dudas. Nicolás nos hizo sentir como en casa."</p>
-            <div class="ai-reply">
-              <b>Respuesta sugerida por IA</b>
-              <q>¡Muchas gracias por tu visita! Nos alegra que hayas disfrutado la experiencia. ¡Te esperamos pronto!</q>
-            </div>
-          </div>
-          <div class="review">
-            <div class="review-h">
-              <div class="review-who"><span class="avatar">M</span>María Belén Torres<span class="stars">★★★★★</span></div>
-              <span style="font-size:.7rem;color:var(--g400)">Hace 2 días</span>
-            </div>
-            <p>"Súper atenta con los chicos. Volvemos seguro."</p>
-            <span class="done">✓ Respondida</span>
-          </div>
-        </div>
-
-        <div class="fcard reveal" data-d="2">
-          <h4>Quién genera las reseñas</h4>
-          <p>Taps atribuidos por colaborador, en vivo.</p>
-          <div id="rank"></div>
-        </div>
-      </div>
+      <p class="under-note reveal">Cada cliente entra por un link privado propio. No hay usuario ni contraseña que recordar, y el link se rota desde la ficha del comercio cuando hace falta.</p>
     </div>
   </section>
 
@@ -366,10 +362,10 @@
           <div class="field">
             <label id="lbl-rubro">Rubro</label>
             <div class="chips" role="group" aria-labelledby="lbl-rubro" id="roi-industries">
-              <button class="chip is-active" data-tap=".07" data-conv=".06">Gastronomía / Bar</button>
-              <button class="chip" data-tap=".09" data-conv=".07">Estética / Salud</button>
-              <button class="chip" data-tap=".08" data-conv=".065">Hotel / Alojamiento</button>
-              <button class="chip" data-tap=".06" data-conv=".05">Comercio Retail</button>
+              <button class="chip is-active" data-tap=".07" data-pub=".28">Gastronomía / Bar</button>
+              <button class="chip" data-tap=".09" data-pub=".32">Estética / Salud</button>
+              <button class="chip" data-tap=".08" data-pub=".30">Hotel / Alojamiento</button>
+              <button class="chip" data-tap=".06" data-pub=".25">Comercio Retail</button>
             </div>
           </div>
           <div class="field">
@@ -392,15 +388,15 @@
 
         <div class="roi-out" aria-live="polite">
           <div class="roi-pair">
-            <div class="rcard green"><p>Reseñas / mes</p><b id="r-reviews">~48</b><small>estimadas nuevas en Google</small></div>
-            <div class="rcard blue"><p>Taps estimados</p><b id="r-taps">~56</b><small>interacciones con el cartel</small></div>
+            <div class="rcard blue"><p>Taps / mes</p><b id="r-taps">~56</b><small>clientes que tocan el cartel</small></div>
+            <div class="rcard green"><p>Reseñas / mes</p><b id="r-reviews">~16</b><small>de esos taps, los que publican</small></div>
           </div>
-          <div class="rcard"><p>Nuevos clientes por mejor posicionamiento</p><b id="r-new">+120 – 280</b><small>clientes nuevos / mes (+15% a +35% en Maps e IA)</small></div>
+          <div class="rcard"><p>Nuevos clientes por mejor posicionamiento</p><b id="r-new">+24 – 56</b><small>clientes nuevos / mes (+3% a +7% sobre tu base actual)</small></div>
           <div class="rcard light">
             <p>Impacto estimado en facturación</p>
-            <b id="r-rev">$600.000 – $1.400.000</b>
+            <b id="r-rev">$120.000 – $280.000</b>
             <small>ARS / mes en ingresos adicionales</small>
-            <p class="roi-note">* Estimación basada en tasas de conversión promedio del rubro seleccionado. Los resultados reales varían según cada negocio.</p>
+            <p class="roi-note">* Los taps y las reseñas salen de las tasas promedio del rubro elegido y de lo que medimos en locales instalados. El rango de clientes nuevos asume una mejora sostenida de reputación en torno a +0,7★ — el promedio de nuestros clientes — y un impacto de entre 5% y 9% de facturación por estrella, que es lo que reporta la literatura sobre reseñas y ventas. Es una estimación, no una promesa: los resultados reales dependen de cada negocio.</p>
           </div>
         </div>
       </div>
@@ -577,9 +573,10 @@
           <h4>Producto</h4>
           <ul>
             <li><a href="#hardware">Hardware</a></li>
-            <li><a href="#panel">El Panel</a></li>
-            <li><a href="#como-funciona">Cómo funciona</a></li>
-            <li><a href="#roi">Simulador ROI</a></li>
+            <li><a href="#mecanismo">El mecanismo</a></li>
+            <li><a href="#panel">El panel</a></li>
+            <li><a href="#como-funciona">Puesta en marcha</a></li>
+            <li><a href="#roi">Simulador</a></li>
             <li><a href="#planes">Planes</a></li>
           </ul>
         </div>
@@ -614,5 +611,6 @@
 
 <script src="assets/scroll-world.js"></script>
 <script src="assets/app.js"></script>
+<script src="assets/panel.js"></script>
 </body>
 </html>

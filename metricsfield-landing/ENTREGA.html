@@ -124,12 +124,12 @@
 
 <header class="mast">
   <p class="eyebrow">Entrega técnica · landing interactiva</p>
-  <h1>La landing, con el film manejado por el scroll</h1>
+  <h1>La landing: el film, el mecanismo y el panel navegable</h1>
   <p class="stand">
     Se aplicó la skill <code>scroll-world</code> sobre la landing de MetricsField. El resultado son
-    dos actos: un vuelo cinematográfico donde el scroll maneja la cámara, y abajo la página de
-    venta completa con todas sus interacciones. Todo con material que ya tenías, sin gastar
-    un crédito de generación.
+    tres piezas: un vuelo donde el scroll maneja la cámara, la cadena técnica del tap dibujada
+    a medida que scrolleás, y el portal de cliente recreado y navegable dentro de la página.
+    Todo con material propio, sin gastar un crédito de generación.
   </p>
   <div class="mast-meta">
     <span>Rama: <code>claude/metricsfield-landing-interactive-rntdz5</code></span>
@@ -152,10 +152,10 @@
     exactamente la regla que la skill dice que hace o rompe el efecto, conseguida sin generar nada.
   </p>
   <p>
-    <strong>3 · Quedan dos cosas que dependen de vos.</strong> Los logos y las fotos de producto siguen
-    apuntando a Vercel Blob porque este entorno tiene ese host bloqueado por política de red; te dejé
-    <code>self-host-assets.sh</code> para bajarlos desde tu máquina. Y hay un número en el simulador ROI
-    que conviene que revises (sección 04).
+    <strong>3 · Para probarla en el celular hay una vista previa lista.</strong> Un archivo único con el
+    video, la tipografía y las imágenes embebidos, publicado en
+    <code>claude.ai/code/artifact/d68ae408</code>. Se abre de una en el teléfono, sin deploy ni instalar nada.
+    Es lo único que faltaba verificar: que Safari en iOS scrubbee el video sin trabarse.
   </p>
 </div>
 
@@ -196,27 +196,52 @@
       literalmente cyan), azul en el panel. El riel de la derecha marca dónde estás y permite saltar.
     </p>
 
-    <h3>Acto 2 — la página de venta</h3>
-    <p>Reconstruida entera desde el design handoff, con todas las interacciones andando:</p>
+    <h3>Acto 2 — el mecanismo, dibujado por el scroll</h3>
+    <p>
+      Seis pasos con lo que realmente pasa en un tap: el chip se alimenta del campo del teléfono,
+      abre un link corto, ese link <strong>pega en nuestro servidor y no en Google</strong>, ahí se
+      registra qué pieza / qué sucursal / de quién era la tarjeta / qué hora / NFC o QR, y recién
+      después redirige. La línea que une los pasos se dibuja con el scroll y cada paso se enciende
+      cuando le toca.
+    </p>
+    <p>
+      Ese rodeo por el servidor es lo que explica las dos cosas que más se preguntan: por qué se
+      puede medir, y por qué el destino se cambia sin reimprimir el hardware.
+    </p>
+
+    <h3>Acto 3 — el portal, navegable dentro de la landing</h3>
+    <p>
+      En vez de pegar capturas, el portal está <strong>reconstruido y funcionando</strong>: el
+      visitante hace clic en el menú y recorre las ocho secciones reales. Cada pantalla dice arriba
+      para qué sirve, en una línea.
+    </p>
     <ul>
-      <li><strong>Navbar</strong> transparente sobre el film, sólida al entrar en la página; scrollspy que marca la sección; hamburguesa y barra fija de WhatsApp en celular.</li>
-      <li><strong>Hardware</strong> con tabs entre los tres productos.</li>
-      <li><strong>Así se usa</strong>: los dos videos de demo también scrubbeados por scroll, con barra de progreso propia.</li>
-      <li><strong>El Panel</strong>: navegador con las <strong>seis capturas reales</strong> del producto, conmutables.</li>
-      <li><strong>Simulador ROI</strong>: dos sliders + cuatro rubros, cálculo en vivo.</li>
-      <li><strong>Comparativa, planes, FAQ</strong> (acordeón nativo con <code>&lt;details name&gt;</code>), CTA y footer.</li>
-      <li>Reveals al entrar en pantalla, contadores animados y barra de progreso de lectura.</li>
+      <li><strong>Resumen</strong> — los cinco KPI contando desde cero y las tres fichas con el anillo de calificación dibujándose.</li>
+      <li><strong>Reseñas</strong> — una reseña con su borrador de respuesta y los botones de publicar o editar.</li>
+      <li><strong>Dispositivos</strong> — la tabla de piezas con su código, dónde está cada una y sus taps.</li>
+      <li><strong>Escaneos</strong> — el log crudo: hora, pieza, dispositivo, NFC o QR. De ahí sale todo lo demás.</li>
+      <li><strong>Mi Rating</strong> — la curva de 4,1 a 4,8 dibujándose. <strong>Competidores</strong> — tu ficha contra la zona. <strong>Resumen del mes</strong>.</li>
+    </ul>
+    <p>
+      Los datos son los de la cuenta demo de tu captura: Cliente Prueba, Restaurante/Bar en Nueva
+      Córdoba, 3 locales, 1.576 taps, 140 reseñas, datos a junio 2026.
+    </p>
+
+    <h3>Y la página de venta</h3>
+    <ul>
+      <li><strong>Qué es</strong>: hardware, software y servicio en tres tarjetas concretas, en lugar del segundo hero que había antes.</li>
+      <li><strong>Así se usa</strong>: los dos videos quedan <strong>pinneados</strong> mientras el texto pasa, y cada punto se enciende cuando el scrub llega a su tramo.</li>
+      <li><strong>Hardware</strong> con tabs, <strong>simulador ROI</strong>, comparativa, planes, FAQ y CTA.</li>
+      <li>Navbar con scrollspy, reveals, contadores y barra de progreso de lectura.</li>
     </ul>
   </div>
 
   <div class="callout">
-    <p class="eyebrow">Un cambio respecto del handoff original</p>
+    <p class="eyebrow">Sobre las seis capturas viejas</p>
     <p>
-      El diseño pedía recrear un dashboard falso en HTML para la sección del Panel. Usé
-      <strong>las seis capturas reales</strong> que venían en <code>assets/</code>, dentro de un marco de navegador
-      con la lista de vistas al costado. Es más corto de mantener y prueba más: es el producto, no una maqueta.
-      Los tres bloques informativos del mock (alertas, respuestas de IA, ranking de personal) quedaron
-      abajo como tarjetas, con el mismo contenido.
+      Siguen en <code>assets/img/panel-*.webp</code> pero ya no se usan: el portal recreado las
+      reemplazó. Las dejé por si querés una galería de capturas reales como respaldo. Si no,
+      se borran y son 470 KB menos.
     </p>
   </div>
 </section>
@@ -328,13 +353,24 @@
         <code>app.js</code>. No hay que rehacer nada.
       </p>
     </div>
-    <div class="card warn">
-      <div class="card-h"><span class="chip c-warn">Revisar</span><span class="card-t">El número de «clientes nuevos» del ROI</span></div>
+    <div class="card ok">
+      <div class="card-h"><span class="chip c-ok">Resuelto</span><span class="card-t">El simulador ROI, rehecho</span></div>
       <p>
-        Reproduje la fórmula del prototipo tal cual, pero conviene que la mires: calcula los clientes nuevos
-        como <strong>15% a 35% de tu base mensual entera</strong>. Con 3.000 clientes/mes eso proyecta
-        <strong>+450 a +1.050 clientes nuevos</strong> y hasta $5,25M de facturación adicional. Es una promesa
-        grande para dejar sola en una landing. Si querés, la bajo a un rango defendible en un minuto.
+        El prototipo tenía dos problemas. Calculaba las reseñas <em>sobre los clientes</em> en vez de sobre
+        los taps, así que daba 48 reseñas para 56 taps: un 86% de los que tocan el cartel escribiendo reseña.
+        Y proyectaba los clientes nuevos como <strong>15%–35% de la base mensual entera</strong> — con 3.000
+        clientes/mes eso son +450 a +1.050 nuevos y $5,25M de facturación extra.
+      </p>
+      <p>
+        Ahora la cadena respeta el orden de los hechos: <code>taps = clientes × tasa del rubro</code>,
+        <code>reseñas = taps × tasa de publicación</code> (25–32% según rubro), y los clientes nuevos son
+        un <strong>3%–7%</strong> anclado a algo verificable: la ficha del cliente de referencia muestra
+        +0,7★, y el impacto conocido ronda el 5–9% de facturación por estrella. 0,7 sobre ese rango da
+        3,5–6,3%; el 3–7% es esa banda, conservadora del lado de abajo.
+      </p>
+      <p>
+        Para 800 clientes y ticket de $5.000 queda: 56 taps → 16 reseñas → +24 a 56 clientes nuevos →
+        $120.000 a $280.000. La nota al pie de la tarjeta explica el supuesto, en la página.
       </p>
     </div>
     <div class="card warn">

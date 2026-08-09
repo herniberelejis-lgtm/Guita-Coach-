@@ -149,14 +149,20 @@ function mountScrollWorld(container, config) {
     if (reduce || s.loading || !s.clip) return;
     s.loading = true;
     const url = (isMobile() && s.clipM) ? s.clipM : s.clip;
-    fetch(url)
-      .then(r => r.ok ? r.blob() : Promise.reject(new Error(String(r.status))))
-      .then(blob => {
+    // Un data: URI ya viene entero y es seekable: pasarlo por fetch solo
+    // duplicaría el gasto de memoria. Se asigna directo.
+    const source = url.startsWith('data:')
+      ? Promise.resolve(url)
+      : fetch(url)
+          .then(r => r.ok ? r.blob() : Promise.reject(new Error(String(r.status))))
+          .then(blob => URL.createObjectURL(blob));
+    source
+      .then(src => {
         const v = document.createElement('video');
         v.className = 'sw-scene__video';
         v.muted = true; v.playsInline = true; v.preload = 'auto';
         v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
-        v.src = URL.createObjectURL(blob);
+        v.src = src;
         v.addEventListener('loadedmetadata', () => { s.ready = true; read(); });
         // Recién se oculta el poster cuando pintó un frame de verdad. En iOS un
         // video muted que nunca se reprodujo queda en blanco, y ocultar el still
