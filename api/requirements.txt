@@ -1,0 +1,24 @@
+# Dependencias para el deploy en Vercel.
+#
+# Vercel busca un requirements.txt al lado del entrypoint antes que el de la
+# raíz, así que este archivo reemplaza al de la raíz sólo en Vercel. Railway,
+# Docker y el entorno local siguen usando /requirements.txt sin cambios.
+#
+# Única diferencia: no lleva uvicorn. Vercel corre la app ASGI directamente y
+# nunca lo importa, pero uvicorn[standard] arrastra uvloop, httptools, watchfiles
+# y PyYAML: ~21 MB que cuentan contra el límite de 250 MB del bundle. Con esto
+# el bundle queda en ~216 MB; con uvicorn se pasa y el deploy falla.
+fastapi==0.115.5
+sqlalchemy==2.0.36
+python-dotenv==1.0.1
+httpx==0.28.0
+anthropic==0.40.0
+pydantic==2.11.5
+pydantic-settings==2.7.0
+python-multipart==0.0.19
+aiofiles==24.1.0
+google-generativeai>=0.8.0
+email-validator>=2.0
+openpyxl==3.1.5
+psycopg2-binary==2.9.12
+cryptography==43.0.3

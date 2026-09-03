@@ -1,7 +1,7 @@
 """Sync endpoints — Gmail, Mercado Pago, Plaid, y Prometeo."""
 from datetime import datetime
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Connection, Transaction, User
@@ -101,7 +101,7 @@ async def _save_transactions(items: list[dict], user_id: int, db: Session) -> in
 
 
 @router.post("/gmail")
-async def sync_gmail(background_tasks: BackgroundTasks, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+async def sync_gmail(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     conn = db.query(Connection).filter_by(user_id=user.id, provider="gmail").first()
     if not conn or conn.status != "connected" or not conn.access_token:
         raise HTTPException(400, "Gmail no conectado. Conectalo desde Configuración.")
@@ -119,13 +119,13 @@ async def sync_gmail(background_tasks: BackgroundTasks, db: Session = Depends(ge
     flagged = mark_duplicates_and_transfers(db, user.id)
     splits = detect_split_candidates(db, user.id)
 
-    background_tasks.add_task(run_alert_engine, user.id, db)
+    await run_alert_engine(user.id, db)
 
     return {"ok": True, "fetched": len(items), "saved": saved, "flagged": flagged, "split_suggestions": splits}
 
 
 @router.post("/mp")
-async def sync_mp(background_tasks: BackgroundTasks, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+async def sync_mp(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     conn = db.query(Connection).filter_by(user_id=user.id, provider="mercadopago").first()
     if not conn or conn.status != "connected" or not conn.access_token:
         raise HTTPException(400, "Mercado Pago no conectado. Conectalo desde Configuración.")
@@ -143,14 +143,13 @@ async def sync_mp(background_tasks: BackgroundTasks, db: Session = Depends(get_d
     flagged = mark_duplicates_and_transfers(db, user.id)
     splits = detect_split_candidates(db, user.id)
 
-    background_tasks.add_task(run_alert_engine, user.id, db)
+    await run_alert_engine(user.id, db)
 
     return {"ok": True, "fetched": len(items), "saved": saved, "flagged": flagged, "split_suggestions": splits}
 
 
 @router.post("/csv")
 async def sync_csv(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -169,7 +168,7 @@ async def sync_csv(
     saved = await _save_transactions(items, user_id=user.id, db=db)
     flagged = mark_duplicates_and_transfers(db, user.id)
     splits = detect_split_candidates(db, user.id)
-    background_tasks.add_task(run_alert_engine, user.id, db)
+    await run_alert_engine(user.id, db)
     return {"ok": True, "fetched": len(items), "saved": saved,
             "flagged": flagged, "split_suggestions": splits}
 
@@ -234,7 +233,6 @@ async def exchange_plaid_token(
 
 @router.post("/plaid/sync")
 async def sync_plaid_transactions(
-    background_tasks: BackgroundTasks,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -276,7 +274,7 @@ async def sync_plaid_transactions(
     # Ejecutar deduplicación y alertas
     flagged = mark_duplicates_and_transfers(db, user.id)
     splits = detect_split_candidates(db, user.id)
-    background_tasks.add_task(run_alert_engine, user.id, db)
+    await run_alert_engine(user.id, db)
 
     return {
         "ok": True,
@@ -352,7 +350,6 @@ async def prometeo_login(
 
 @router.post("/prometeo/sync")
 async def sync_prometeo_transactions(
-    background_tasks: BackgroundTasks,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -403,6 +400,6 @@ async def sync_prometeo_transactions(
 
     flagged = mark_duplicates_and_transfers(db, user.id)
     splits = detect_split_candidates(db, user.id)
-    background_tasks.add_task(run_alert_engine, user.id, db)
+    await run_alert_engine(user.id, db)
 
     return {"ok": True, "fetched": len(all_txns), "saved": saved, "accounts": len(accounts), "flagged": flagged, "split_suggestions": splits}

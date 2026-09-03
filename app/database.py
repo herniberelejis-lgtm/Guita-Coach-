@@ -1,7 +1,14 @@
+import os
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
 from .models import Base
 from .config import get_settings
+
+# Vercel (y cualquier runtime serverless) expone esta variable. El disco es de
+# sólo lectura salvo /tmp, y /tmp es efímero y distinto por instancia.
+IS_SERVERLESS = bool(os.environ.get("VERCEL"))
 
 
 def _resolve_database_url() -> str:
@@ -15,10 +22,26 @@ def _resolve_database_url() -> str:
 DATABASE_URL = _resolve_database_url()
 IS_SQLITE = DATABASE_URL.startswith("sqlite")
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if IS_SQLITE else {},
-)
+if IS_SERVERLESS and IS_SQLITE:
+    # Fallar acá con un mensaje claro en vez de morir más adelante con
+    # "attempt to write a readonly database", que no dice nada.
+    raise RuntimeError(
+        "DATABASE_URL no está seteada. En serverless no se puede usar SQLite: "
+        "el disco es de sólo lectura y se borra en cada invocación. "
+        "Creá un Postgres (Neon, Supabase) y seteá DATABASE_URL."
+    )
+
+if IS_SQLITE:
+    _engine_kwargs = {"connect_args": {"check_same_thread": False}}
+elif IS_SERVERLESS:
+    # Cada instancia levanta su propio pool y se congela sin cerrarlo, así que
+    # un pool normal agota las conexiones del Postgres. NullPool abre y cierra
+    # por request; el pooling real lo hace el endpoint pooled del proveedor.
+    _engine_kwargs = {"poolclass": NullPool, "pool_pre_ping": True}
+else:
+    _engine_kwargs = {"pool_pre_ping": True}
+
+engine = create_engine(DATABASE_URL, **_engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def _run_migrations():
@@ -41,6 +64,9 @@ def _run_migrations():
         "ALTER TABLE investment_price ADD COLUMN asset_type VARCHAR DEFAULT 'stock'",
         "ALTER TABLE users ADD COLUMN balance FLOAT DEFAULT 0.0",
     ]
+    if _schema_is_current(migrations):
+        return
+
     with engine.connect() as conn:
         for sql in migrations:
             try:
@@ -51,6 +77,26 @@ def _run_migrations():
                 if "duplicate column" not in msg and "already exists" not in msg:
                     raise
                 conn.rollback()
+
+
+def _schema_is_current(migrations: list[str]) -> bool:
+    """¿Ya está aplicada la última migración?
+
+    Las migraciones son aditivas y en orden, así que si existe la columna de la
+    última, existen todas. Sirve para no disparar 16 ALTER TABLE que fallan en
+    cada arranque: en serverless eso es un cold start entero de latencia contra
+    una base remota, y varias instancias arrancando a la vez corren el mismo DDL.
+    """
+    from sqlalchemy import inspect
+
+    parts = migrations[-1].split()
+    table, column = parts[2], parts[5]
+    try:
+        cols = inspect(engine).get_columns(table)
+    except Exception:
+        return False  # la tabla no existe todavía: hay que migrar
+    return any(c["name"] == column for c in cols)
+
 
 def init_db():
     Base.metadata.create_all(bind=engine)
