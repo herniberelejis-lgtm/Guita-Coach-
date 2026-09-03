@@ -116,6 +116,7 @@ async def refresh_token(token: str) -> dict:
     async with httpx.AsyncClient() as client:
         r = await client.post("https://api.mercadopago.com/oauth/token", data={
             "grant_type": "refresh_token",
+            "client_id": settings.mp_client_id,  # requerido por MP: sin esto devuelve 400
             "client_secret": settings.mp_client_secret,
             "refresh_token": token,
         })
